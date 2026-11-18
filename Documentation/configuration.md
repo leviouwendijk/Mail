@@ -62,10 +62,11 @@ its mailbox login is set. An empty written value (`.host = ""`) is still an
 error. Passwords are never literals: a `Secret` names where the password is
 kept.
 
-A convention that keeps the variables findable: `MAIL_USER_<ID>` and
-`MAIL_PASSWORD_<ID>` per mailbox, with `<ID>` the mailbox and a short domain
-tag, as in `MAIL_USER_LEVI_HM`. A Gmail app password goes in
-`MAIL_PASSWORD_<ID>` too.
+A convention that keeps the variables findable: the username is usually
+just the address, written literally, and the password is `MAIL_PASSWORD_<ID>`,
+with `<ID>` the mailbox and a short domain tag, as in `MAIL_PASSWORD_LEVI_HM`.
+A Gmail app password goes there too. When a username must stay out of the
+file, use `MAIL_USER_<ID>`.
 
 ```frame
 .password = .{ .env = "MAIL_WORK_PASSWORD" },
