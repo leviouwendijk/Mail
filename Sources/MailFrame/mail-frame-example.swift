@@ -65,5 +65,26 @@ public extension MailFrame {
             .sending = .allowed,
             .about = "Transactional mail through Amazon SES.",
         };
+
+        // Reading from one host and sending through another, each with its own
+        // login: IMAP uses the account's username and password, while the SMTP
+        // server (here SES) carries its own. Sent copies go to the IMAP host.
+        let office: Account = .{
+            .provider = .{
+                .imap = .{ .host = "imap.mailhost.example" },
+                .smtp = .{
+                    .host = .{ .env = "AWS_SES_HOST" },
+                    .port = .{ .env = "AWS_SES_PORT" },
+                    .username = .{ .env = "AWS_SMTP_USER" },
+                    .password = .{ .env = "AWS_SMTP_PASSWD" },
+                },
+            },
+            .username = "office@practice.example",
+            .password = .{ .keychain = "office" },
+            .identities = [.{ .address = "office@practice.example", .name = "Practice Office" }],
+            .folders = .{ .sent = "Sent" },
+            .sending = .confirm,
+            .about = "Read from the mailbox host, send through SES.",
+        };
         """#
 }

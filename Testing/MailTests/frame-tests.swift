@@ -21,7 +21,7 @@ enum FrameTests {
             environment: environment
         )
 
-        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal", "transactional"], "Accounts in order")
+        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal", "transactional", "office"], "Accounts in order")
         let work = try Expect.notNil(accounts.defaultAccount, "Default account")
         try Expect.equal(work.identifier, "work", "First is default")
         try Expect.equal(work.identities.map(\.address.address.raw), ["alex@practice.example", "info@practice.example"], "Identities")
@@ -60,6 +60,14 @@ enum FrameTests {
         try Expect.equal(ses.smtp?.server.authentication?.username, "AKIAEXAMPLE", "Username from env")
         let password = try await accounts.credentials.resolve(ses.smtp!.server.authentication!.password).utf8()
         try Expect.equal(password, "ses-secret", "Password from env at connect time")
+
+        let office = try Expect.notNil(accounts.account(named: "office"), "Split account")
+        try Expect.equal(office.imap?.server.host, "imap.mailhost.example", "Reads from the mailbox host")
+        try Expect.equal(office.imap?.server.authentication?.username, "office@practice.example", "IMAP uses the account login")
+        try Expect.equal(office.smtp?.server.host, "email-smtp.eu-north-1.amazonaws.com", "Sends through SES")
+        try Expect.equal(office.smtp?.server.authentication?.username, "AKIAEXAMPLE", "SMTP uses its own login")
+        try Expect.equal(accounts.source(of: office.imap!.server.authentication!.password), "keychain item office (service mail)", "IMAP password from the keychain")
+        try Expect.equal(office.folders[.sent], "Sent", "Sent copies on the IMAP host")
 
         var unset = environment
         unset["AWS_SES_HOST"] = nil
