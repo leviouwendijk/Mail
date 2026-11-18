@@ -54,9 +54,18 @@ email check     # validates, and says per server whether its password resolves
 .username = .{ .env = "AWS_SMTP_USER" },
 ```
 
-Variables are read when the configuration loads; an unset one is an error
-naming it. Passwords are never literals: a `Secret` names where the password
-is kept.
+Variables are read when the configuration loads. An unset one does not fail
+the configuration: it leaves out only the server that needs it, and
+`email check` shows that server as `UNAVAILABLE` with the variable's name. An
+account that sends through SES with SES's own login can therefore send before
+its mailbox login is set. An empty written value (`.host = ""`) is still an
+error. Passwords are never literals: a `Secret` names where the password is
+kept.
+
+A convention that keeps the variables findable: `MAIL_USER_<ID>` and
+`MAIL_PASSWORD_<ID>` per mailbox, with `<ID>` the mailbox and a short domain
+tag, as in `MAIL_USER_LEVI_HM`. A Gmail app password goes in
+`MAIL_PASSWORD_<ID>` too.
 
 ```frame
 .password = .{ .env = "MAIL_WORK_PASSWORD" },
