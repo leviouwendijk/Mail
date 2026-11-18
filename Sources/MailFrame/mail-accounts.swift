@@ -42,6 +42,34 @@ public struct MailAccounts: Sendable {
     /// In declaration order; the first is the default.
     public let accounts: [Account]
     public let credentials: any CredentialProvider
+    private let routes: [CredentialReference: any CredentialProvider]
+
+    private init(
+        accounts: [Account],
+        routes: [CredentialReference: any CredentialProvider]
+    ) {
+        self.accounts = accounts
+        self.routes = routes
+        self.credentials = RoutedCredentialProvider(routes: routes)
+    }
+
+    /// Accounts from several files, in order; a binding name may appear once.
+    public static func merging(
+        _ parts: [MailAccounts]
+    ) throws -> MailAccounts {
+        var accounts: [Account] = []
+        var routes: [CredentialReference: any CredentialProvider] = [:]
+        for part in parts {
+            for account in part.accounts {
+                guard !accounts.contains(where: { $0.identifier == account.identifier }) else {
+                    throw Failure.invalid(field: account.identifier, reason: "an account with this name is declared in more than one file")
+                }
+                accounts.append(account)
+            }
+            routes.merge(part.routes) { first, _ in first }
+        }
+        return MailAccounts(accounts: accounts, routes: routes)
+    }
 
     public var defaultAccount: Account? {
         accounts.first
@@ -163,8 +191,7 @@ public struct MailAccounts: Sendable {
             ))
         }
 
-        self.accounts = accounts
-        self.credentials = RoutedCredentialProvider(routes: routes)
+        self.init(accounts: accounts, routes: routes)
     }
 
     private static func server(

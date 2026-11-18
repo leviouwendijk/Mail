@@ -29,6 +29,10 @@ let package = Package(
             targets: ["MailFrame"]
         ),
         .executable(
+            name: "email",
+            targets: ["email"]
+        ),
+        .executable(
             name: "t_mail",
             targets: ["MailTests"]
         ),
@@ -43,6 +47,8 @@ let package = Package(
         .package(url: "https://github.com/leviouwendijk/Parsing.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Milieu.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Frame.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/IO.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/Arguments.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Testing.git", branch: "master"),
     ],
     targets: [
@@ -96,7 +102,24 @@ let package = Package(
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "Milieu", package: "Milieu"),
                 .product(name: "Readers", package: "Readers"),
+                .product(name: "IO", package: "IO"),
             ]
+        ),
+
+        // the `email` command line
+        .executableTarget(
+            name: "email",
+            dependencies: [
+                "Mail",
+                "MailConnection",
+                "SMTP",
+                "IMAP",
+                "MailFrame",
+                .product(name: "Frame", package: "Frame"),
+                .product(name: "Arguments", package: "Arguments"),
+                .product(name: "Readers", package: "Readers"),
+            ],
+            path: "Sources/MailCLI"
         ),
 
         .executableTarget(

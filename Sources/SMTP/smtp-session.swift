@@ -36,6 +36,51 @@ public struct SMTPSession: Sendable {
             throw SMTPError.noRecipients
         }
 
+        try await open(credentials: credentials)
+
+        try await command("MAIL FROM:<\(sender.raw)>", expecting: 250)
+
+        var accepted: [EmailAddress] = []
+        var rejected: [SMTPRecipientRejection] = []
+        for recipient in recipients {
+            try await transport.writeLine("RCPT TO:<\(recipient.raw)>")
+            let reply = try await SMTPReply.read(from: transport)
+            if reply.code == 250 || reply.code == 251 {
+                accepted.append(recipient)
+            } else {
+                rejected.append(SMTPRecipientRejection(recipient: recipient, reply: reply))
+            }
+        }
+        guard !accepted.isEmpty else {
+            _ = try? await command("QUIT", expecting: 221)
+            throw SMTPError.allRecipientsRejected(rejected)
+        }
+
+        try await command("DATA", expecting: 354)
+        try await transport.write(Self.dotStuffed(message) + Data(".\r\n".utf8))
+        let delivered = try await SMTPReply.read(from: transport)
+        try expect(delivered, 250, after: "message data")
+
+        _ = try? await command("QUIT", expecting: 221)
+        return SMTPDelivery(accepted: accepted, rejected: rejected, reply: delivered)
+    }
+
+    /// Greeting, `EHLO`, `STARTTLS` and login, then `QUIT`, without sending:
+    /// checks that an account can submit. Returns the server's extensions.
+    @discardableResult
+    public func verify(
+        credentials: MailCredentials? = nil
+    ) async throws -> Set<String> {
+        let hello = try await open(credentials: credentials)
+        _ = try? await command("QUIT", expecting: 221)
+        return Self.extensions(hello)
+    }
+
+    /// Greeting, `EHLO`, the optional `STARTTLS` upgrade and login; the last `EHLO` reply.
+    @discardableResult
+    private func open(
+        credentials: MailCredentials?
+    ) async throws -> SMTPReply {
         try expect(try await SMTPReply.read(from: transport), 220, after: "greeting")
         var hello = try await command("EHLO \(clientName)", expecting: 250)
 
@@ -66,31 +111,7 @@ public struct SMTPSession: Sendable {
             )
         }
 
-        try await command("MAIL FROM:<\(sender.raw)>", expecting: 250)
-
-        var accepted: [EmailAddress] = []
-        var rejected: [SMTPRecipientRejection] = []
-        for recipient in recipients {
-            try await transport.writeLine("RCPT TO:<\(recipient.raw)>")
-            let reply = try await SMTPReply.read(from: transport)
-            if reply.code == 250 || reply.code == 251 {
-                accepted.append(recipient)
-            } else {
-                rejected.append(SMTPRecipientRejection(recipient: recipient, reply: reply))
-            }
-        }
-        guard !accepted.isEmpty else {
-            _ = try? await command("QUIT", expecting: 221)
-            throw SMTPError.allRecipientsRejected(rejected)
-        }
-
-        try await command("DATA", expecting: 354)
-        try await transport.write(Self.dotStuffed(message) + Data(".\r\n".utf8))
-        let delivered = try await SMTPReply.read(from: transport)
-        try expect(delivered, 250, after: "message data")
-
-        _ = try? await command("QUIT", expecting: 221)
-        return SMTPDelivery(accepted: accepted, rejected: rejected, reply: delivered)
+        return hello
     }
 
     /// Extension keywords from an `EHLO` reply, uppercased; the first line is the greeting.

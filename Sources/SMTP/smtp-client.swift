@@ -46,4 +46,23 @@ public struct SMTPClient: Sendable {
             throw error
         }
     }
+
+    /// Connects, upgrades and logs in, then quits without sending.
+    @discardableResult
+    public func verify() async throws -> Set<String> {
+        let resolved = try await configuration.server.resolveCredentials(using: credentials)
+        let transport = try await connector(configuration.server)
+        do {
+            let extensions = try await SMTPSession(
+                transport: transport,
+                clientName: configuration.clientName,
+                startTLS: configuration.server.security == .startTLS
+            ).verify(credentials: resolved)
+            await transport.close()
+            return extensions
+        } catch {
+            await transport.close()
+            throw error
+        }
+    }
 }

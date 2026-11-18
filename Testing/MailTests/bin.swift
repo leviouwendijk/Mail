@@ -109,6 +109,12 @@ enum MailTestSuite {
         Test("starttls-frame-icloud-defaults") {
             try StartTLSTests.frameDefaults()
         }
+        Test("configuration-directory-merges-and-reloads") {
+            try ConfigurationTests.directory()
+        }
+        Test("smtp-verify-logs-in-without-sending") {
+            try await ConfigurationTests.smtpVerify()
+        }
         Test("sasl-plain-response") {
             try ConnectionTests.saslPlain()
         }
