@@ -21,6 +21,12 @@ public struct MailAccounts: Sendable {
         }
     }
 
+    /// What an account's servers are for.
+    public enum Service: String, Sendable, Hashable, CaseIterable {
+        case smtp
+        case imap
+    }
+
     public struct Account: Sendable {
         /// The binding name.
         public let identifier: String
@@ -36,6 +42,9 @@ public struct MailAccounts: Sendable {
         /// Its group, for selectors such as `hondenmeesters:@junk`.
         public let group: String?
         public let about: String?
+        /// Servers left out because a setting they need is not in the
+        /// environment, with the reason; the account's other server still works.
+        public let unavailable: [Service: String]
 
         public var defaultIdentity: MailIdentity {
             identities[0]
@@ -204,6 +213,8 @@ public struct MailAccounts: Sendable {
             let field = binding.name
             let spec = try document.decode(MailFrame.Account.self, binding: field)
 
+            var unavailable: [Service: String] = [:]
+
             /// The server's own login, else the account's; each part falls back separately.
             func authentication(
                 for server: MailFrame.Server,
@@ -214,7 +225,7 @@ public struct MailAccounts: Sendable {
                     throw Failure.invalid(field: "\(at).username", reason: "set username on the account or on this server")
                 }
                 guard let username = usernameSetting.resolve(in: environment).flatMap(Self.nonEmpty) else {
-                    throw Failure.invalid(field: server.username == nil ? "\(field).username" : "\(at).username", reason: Self.unset(usernameSetting))
+                    throw Self.missing(usernameSetting, at: server.username == nil ? "\(field).username" : "\(at).username")
                 }
                 guard let secret = server.password ?? spec.password else {
                     throw Failure.invalid(field: "\(at).password", reason: "set password on the account or on this server")
@@ -239,17 +250,30 @@ public struct MailAccounts: Sendable {
             guard spec.provider.smtp != nil || spec.provider.imap != nil else {
                 throw Failure.invalid(field: "\(field).provider", reason: "set smtp, imap or both")
             }
-            let smtp = try spec.provider.smtp.map { server in
+            /// The server, or `nil` with its reason when the environment lacks a setting it needs.
+            func available<Configuration>(
+                _ service: Service,
+                _ make: () throws -> Configuration
+            ) throws -> Configuration? {
+                do {
+                    return try make()
+                } catch let unresolved as Unresolved {
+                    unavailable[service] = "\(unresolved.field): \(unresolved.reason)"
+                    return nil
+                }
+            }
+
+            let smtp = try spec.provider.smtp.flatMap { server in try available(.smtp) {
                 SMTPConfiguration(
                     server: try Self.server(server, defaultPorts: (465, 587), authentication: authentication(for: server, role: "smtp"), environment: environment, at: "\(field).provider.smtp"),
                     clientName: Self.clientName(spec.identities.first?.address)
                 )
-            }
-            let imap = try spec.provider.imap.map { server in
+            } }
+            let imap = try spec.provider.imap.flatMap { server in try available(.imap) {
                 IMAPConfiguration(
                     server: try Self.server(server, defaultPorts: (993, 143), authentication: authentication(for: server, role: "imap"), environment: environment, at: "\(field).provider.imap")
                 )
-            }
+            } }
 
             guard !spec.identities.isEmpty else {
                 throw Failure.invalid(field: "\(field).identities", reason: "declare at least one identity")
@@ -267,7 +291,8 @@ public struct MailAccounts: Sendable {
                 sending: spec.sending ?? .drafts,
                 savesSentMail: spec.provider.features?.savesSentMail ?? false,
                 group: spec.group.flatMap(Self.nonEmpty) ?? groups[field],
-                about: spec.about.flatMap(Self.nonEmpty)
+                about: spec.about.flatMap(Self.nonEmpty),
+                unavailable: unavailable
             ))
         }
 
@@ -312,7 +337,7 @@ public struct MailAccounts: Sendable {
         at field: String
     ) throws -> MailServerConfiguration {
         guard let host = spec.host.resolve(in: environment).flatMap(nonEmpty) else {
-            throw Failure.invalid(field: "\(field).host", reason: unset(spec.host))
+            throw missing(spec.host, at: "\(field).host")
         }
         let security: MailSecurity
         switch spec.security ?? .tls {
@@ -326,7 +351,7 @@ public struct MailAccounts: Sendable {
         var port = security == .startTLS ? defaultPorts.startTLS : defaultPorts.tls
         if let setting = spec.port {
             guard let value = setting.resolve(in: environment) else {
-                throw Failure.invalid(field: "\(field).port", reason: unset(setting))
+                throw missing(setting, at: "\(field).port")
             }
             guard let valid = UInt16(exactly: value), valid > 0 else {
                 throw Failure.invalid(field: "\(field).port", reason: "must be between 1 and 65535")
@@ -386,15 +411,23 @@ public struct MailAccounts: Sendable {
             .map { String($0.domain) } ?? "localhost"
     }
 
-    /// Why a setting has no value: an unset variable names itself; a written value was empty.
-    private static func unset<Value>(
-        _ setting: MailFrame.Setting<Value>
-    ) -> String {
+    /// A setting with no value, which leaves its server out instead of failing the file.
+    private struct Unresolved: Error {
+        let field: String
+        let reason: String
+    }
+
+    /// Why a setting has no value: an unset variable leaves its server out;
+    /// an empty written value is an error in the file.
+    private static func missing<Value>(
+        _ setting: MailFrame.Setting<Value>,
+        at field: String
+    ) -> any Error {
         switch setting {
         case .env(let variable):
-            return "environment variable \(variable) is unset, empty or not a valid \(Value.self)"
+            return Unresolved(field: field, reason: "environment variable \(variable) is unset, empty or not a valid \(Value.self)")
         case .value:
-            return "must not be empty"
+            return Failure.invalid(field: field, reason: "must not be empty")
         }
     }
 

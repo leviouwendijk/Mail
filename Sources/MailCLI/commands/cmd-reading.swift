@@ -26,6 +26,10 @@ enum ProbeCommand: BoundArgumentCommand {
             : [try EmailCLI.account(options.account, in: accounts, access: access)]
         var failed = false
         for account in selected {
+            for (service, reason) in account.unavailable.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                failed = true
+                print("\(account.identifier) \(service.rawValue)  UNAVAILABLE: \(reason)")
+            }
             if let client = accounts.imapClient(for: account) {
                 do {
                     let count = try await client.session { try await $0.list().count }
@@ -184,6 +188,9 @@ enum SearchCommand: BoundArgumentCommand {
             print("\(marker) \(hit.account):\(hit.mailbox) \(hit.summary.uid.rawValue)  \(EmailCLI.shortDate(hit.date))  \(from)\n            \(hit.summary.envelope?.subject ?? "(no subject)")")
         }
         FileHandle.standardError.write(Data("\(result.hits.count) of \(result.total) in \(result.searched.joined(separator: ", "))\n".utf8))
+        for (account, reason) in result.skipped.sorted(by: { $0.key < $1.key }) {
+            FileHandle.standardError.write(Data("skipped \(account): \(reason)\n".utf8))
+        }
     }
 }
 

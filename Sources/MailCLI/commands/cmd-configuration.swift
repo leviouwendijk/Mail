@@ -82,8 +82,11 @@ enum CheckCommand: BoundArgumentCommand {
         let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
         for (index, account) in access.visibleAccounts(in: accounts).enumerated() {
             print("\(account.identifier)\(index == 0 ? " (default)" : ""): sending \(access.sending(for: account).rawValue)")
-            for (role, server) in [("read", account.imap?.server), ("send", account.smtp?.server)] {
+            for (role, service, server) in [("read", MailAccounts.Service.imap, account.imap?.server), ("send", .smtp, account.smtp?.server)] {
                 guard let server else {
+                    if let reason = account.unavailable[service] {
+                        print("  \(role)  UNAVAILABLE: \(reason)")
+                    }
                     continue
                 }
                 var login = "no login"
@@ -131,6 +134,9 @@ enum AccountsCommand: BoundArgumentCommand {
             }
             if let smtp = account.smtp?.server {
                 print("  send  \(smtp.host):\(smtp.port) \(EmailCLI.security(smtp.security)), sending \(access.sending(for: account).rawValue)")
+            }
+            for (service, reason) in account.unavailable.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                print("  \(service == .imap ? "read" : "send")  UNAVAILABLE: \(reason)")
             }
             for identity in access.identities(of: account) {
                 print("  as    \(EmailCLI.display(identity.address))")

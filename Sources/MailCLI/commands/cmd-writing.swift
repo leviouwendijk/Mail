@@ -189,7 +189,7 @@ enum SendCommand: BoundArgumentCommand {
         try access.checkSending()
         var (account, message) = try options.compose(in: accounts, access: access)
         guard let smtp = accounts.smtpClient(for: account) else {
-            throw EmailCLIError.cannotSend(account.identifier)
+            throw EmailCLIError.cannotSend(account.identifier, reason: account.unavailable[.smtp])
         }
         // Fixed before rendering twice, so the Sent copy is the delivered message.
         message.messageID = "\(UUID().uuidString)@\(message.from.address.domain)"

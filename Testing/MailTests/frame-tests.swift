@@ -72,19 +72,32 @@ enum FrameTests {
         try Expect.equal(accounts.source(of: office.imap!.server.authentication!.password), "keychain item office (service mail)", "IMAP password from the keychain")
         try Expect.equal(office.folders[.sent], "Sent", "Sent copies on the IMAP host")
 
+        // An unset variable leaves only the servers that need it out, with the reason.
         var unset = environment
         unset["AWS_SES_HOST"] = nil
-        do {
-            _ = try MailAccounts(source: MailFrame.example, environment: unset)
-            throw TestFlowAssertionFailure(label: "unset", message: "an unset host variable should be refused")
-        } catch let failure as MailAccounts.Failure {
-            try Expect.contains(failure.localizedDescription, "AWS_SES_HOST is unset", "Names the variable")
-        }
+        let partial = try MailAccounts(source: MailFrame.example, environment: unset)
+        let degraded = try Expect.notNil(partial.account(named: "office"), "Office still loads")
+        try Expect.isNil(degraded.smtp, "SES server left out")
+        try Expect.contains(degraded.unavailable[.smtp] ?? "", "AWS_SES_HOST is unset", "Names the variable")
+        try Expect.notNil(degraded.imap, "Still reads from the mailbox host")
+        try Expect.isNil(degraded.unavailable[.imap], "IMAP unaffected")
+        try Expect.notNil(partial.account(named: "work")?.smtp, "Other accounts unaffected")
 
         var badPort = environment
         badPort["AWS_SES_PORT"] = "smtp"
-        try Expect.throwsError("Port variable must be a number") {
-            _ = try MailAccounts(source: MailFrame.example, environment: badPort)
+        let ported = try MailAccounts(source: MailFrame.example, environment: badPort)
+        try Expect.contains(ported.account(named: "transactional")?.unavailable[.smtp] ?? "", "not a valid Int", "Port variable must be a number")
+
+        try Expect.throwsError("An empty written host is an error in the file") {
+            _ = try MailAccounts(source: """
+                import Mail;
+                let a: Account = .{
+                    .provider = .{ .imap = .{ .host = "" } },
+                    .username = "a@example.org",
+                    .password = .{ .env = "A" },
+                    .identities = [.{ .address = "a@example.org" }],
+                };
+                """, environment: [:])
         }
     }
 

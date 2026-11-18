@@ -10,8 +10,8 @@ enum EmailCLIError: Error, LocalizedError {
     case notConfigured(directory: String)
     case invalid(file: String, message: String)
     case unknownAccount(String, known: [String])
-    case cannotRead(String)
-    case cannotSend(String)
+    case cannotRead(String, reason: String?)
+    case cannotSend(String, reason: String?)
     case unknownIdentity(String, known: [String])
     case invalidAddress(String)
     case invalidDate(String)
@@ -27,10 +27,10 @@ enum EmailCLIError: Error, LocalizedError {
             return "\(file): \(message)"
         case .unknownAccount(let name, let known):
             return "No account '\(name)'; known: \(known.joined(separator: ", "))."
-        case .cannotRead(let account):
-            return "Account '\(account)' has no IMAP server."
-        case .cannotSend(let account):
-            return "Account '\(account)' has no SMTP server."
+        case .cannotRead(let account, let reason):
+            return reason.map { "Account '\(account)' cannot be read: \($0)." } ?? "Account '\(account)' has no IMAP server."
+        case .cannotSend(let account, let reason):
+            return reason.map { "Account '\(account)' cannot send: \($0)." } ?? "Account '\(account)' has no SMTP server."
         case .unknownIdentity(let address, let known):
             return "The account does not send as \(address); its identities: \(known.joined(separator: ", "))."
         case .invalidAddress(let address):
@@ -104,7 +104,7 @@ extension EmailCLI {
         in accounts: MailAccounts
     ) throws -> IMAPClient {
         guard let client = accounts.imapClient(for: account) else {
-            throw EmailCLIError.cannotRead(account.identifier)
+            throw EmailCLIError.cannotRead(account.identifier, reason: account.unavailable[.imap])
         }
         return client
     }

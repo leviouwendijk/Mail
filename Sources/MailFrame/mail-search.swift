@@ -20,6 +20,8 @@ public struct MailSearchResult: Sendable {
     public let hits: [MailSearchHit]
     /// `account:mailbox` for each mailbox searched.
     public let searched: [String]
+    /// Accounts the selectors picked that cannot be read, with the reason.
+    public let skipped: [String: String]
 }
 
 public extension MailAccounts {
@@ -49,8 +51,10 @@ public extension MailAccounts {
         var total = 0
         var hits: [MailSearchHit] = []
         var searched: [String] = []
+        var skipped: [String: String] = [:]
         for (account, selectors) in plan {
             guard let client = imapClient(for: account, connector: connector) else {
+                skipped[account.identifier] = account.unavailable[.imap] ?? "no IMAP server"
                 continue
             }
             let found = try await client.session { session -> (Int, [MailSearchHit], [String]) in
@@ -87,7 +91,7 @@ public extension MailAccounts {
         }
 
         let newest = hits.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-        return MailSearchResult(total: total, hits: Array(newest.prefix(limit)), searched: searched)
+        return MailSearchResult(total: total, hits: Array(newest.prefix(limit)), searched: searched, skipped: skipped)
     }
 }
 
