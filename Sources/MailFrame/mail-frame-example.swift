@@ -102,5 +102,17 @@ public extension MailFrame {
             .sending = .confirm,
             .about = "Read from the mailbox host, send through SES.",
         };
+
+        // Access profiles limit what a session or command line can reach:
+        // `email search --access clientDesk`, or an agent session started with
+        // the profile. Accounts by binding (or by name, for other files);
+        // mailboxes with a trailing * include everything below.
+        let clientDesk: Access = .{
+            .accounts = [work],
+            .mailboxes = ["INBOX", "INBOX/Klanten/*"],
+            .identities = ["info@practice.example"],
+            .send = false,
+            .about = "Client mail: read the client folders and draft replies as info@.",
+        };
         """#
 }

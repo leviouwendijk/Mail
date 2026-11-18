@@ -20,10 +20,10 @@ enum ProbeCommand: BoundArgumentCommand {
         _ options: ProbeOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
         let selected = options.all
-            ? accounts.accounts
-            : [try EmailCLI.account(options.account, in: accounts)]
+            ? access.visibleAccounts(in: accounts)
+            : [try EmailCLI.account(options.account, in: accounts, access: access)]
         var failed = false
         for account in selected {
             if let client = accounts.imapClient(for: account) {
@@ -61,6 +61,9 @@ struct ProbeOptions: Sendable, ArgumentGroup {
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
 
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
+
     init() {}
 }
 
@@ -80,11 +83,11 @@ enum MailboxesCommand: BoundArgumentCommand {
         _ options: MailboxesOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        let account = try EmailCLI.account(options.account, in: accounts)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        let account = try EmailCLI.account(options.account, in: accounts, access: access)
         let lines = try await EmailCLI.imap(account, in: accounts).session { session in
             var lines: [String] = []
-            for mailbox in try await session.list() {
+            for mailbox in try await session.list() where access.allows(mailbox: mailbox.name) {
                 var line = mailbox.name
                 if let role = mailbox.specialUse {
                     line += "  [\(role.rawValue)]"
@@ -110,6 +113,9 @@ struct MailboxesOptions: Sendable, ArgumentGroup {
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
 
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
+
     init() {}
 }
 
@@ -129,9 +135,13 @@ enum SearchCommand: BoundArgumentCommand {
         _ options: SearchOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        let account = try EmailCLI.account(options.account, in: accounts)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        let account = try EmailCLI.account(options.account, in: accounts, access: access)
+        try access.check(mailbox: options.mailbox)
         let query = try options.query()
+        if query.usesGmailExtensions {
+            try access.checkCrossLabelSearch()
+        }
 
         let (total, summaries) = try await EmailCLI.imap(account, in: accounts).session { session in
             try await session.select(options.mailbox)
@@ -196,6 +206,9 @@ struct SearchOptions: Sendable, ArgumentGroup {
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
 
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
+
     init() {}
 
     func query() throws -> IMAPSearch {
@@ -233,8 +246,9 @@ enum ReadCommand: BoundArgumentCommand {
         guard options.uid > 0 else {
             throw EmailCLIError.missing("Give the message's UID: email read <uid>.")
         }
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        let account = try EmailCLI.account(options.account, in: accounts)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        let account = try EmailCLI.account(options.account, in: accounts, access: access)
+        try access.check(mailbox: options.mailbox)
         let message = try await EmailCLI.imap(account, in: accounts).session { session in
             try await session.select(options.mailbox)
             return try await session.message(IMAPUID(UInt32(clamping: options.uid)))
@@ -270,6 +284,9 @@ struct ReadOptions: Sendable, ArgumentGroup {
 
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
+
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
 
     init() {}
 }

@@ -71,18 +71,30 @@ extension EmailCLI {
         }
     }
 
+    /// The configuration and the access profile a command runs under.
+    static func scope(
+        directory: String?,
+        access: String?
+    ) throws -> (MailAccounts, MailAccess) {
+        let accounts = try self.accounts(directory: directory)
+        return (accounts, try accounts.access(named: access))
+    }
+
+    /// `name`'s account, or the first the profile can see.
     static func account(
         _ name: String?,
-        in accounts: MailAccounts
+        in accounts: MailAccounts,
+        access: MailAccess = .unrestricted
     ) throws -> MailAccounts.Account {
         guard let name, !name.isEmpty else {
-            guard let account = accounts.defaultAccount else {
-                throw EmailCLIError.missing("The configuration declares no accounts.")
+            guard let account = access.visibleAccounts(in: accounts).first else {
+                throw EmailCLIError.missing("No account is accessible.")
             }
             return account
         }
+        try access.check(account: name)
         guard let account = accounts.account(named: name) else {
-            throw EmailCLIError.unknownAccount(name, known: accounts.accounts.map(\.identifier))
+            throw EmailCLIError.unknownAccount(name, known: access.visibleAccounts(in: accounts).map(\.identifier))
         }
         return account
     }

@@ -16,6 +16,7 @@ public enum MailFrame {
         .decodable(Identity.self, named: "Identity"),
         .decodable(Folders.self, named: "Folders"),
         .decodable(Account.self, named: "Account"),
+        .decodable(Access.self, named: "Access"),
     ])
 
     public static let environment = Frame.Environment([module])

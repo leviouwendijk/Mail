@@ -109,6 +109,12 @@ enum MailTestSuite {
         Test("frame-split-server-logins") {
             try await FrameTests.splitServers()
         }
+        Test("access-profile-matching") {
+            try AccessTests.matching()
+        }
+        Test("access-profile-names") {
+            try AccessTests.names()
+        }
         Test("frame-rejects-invalid") {
             try FrameTests.invalid()
         }

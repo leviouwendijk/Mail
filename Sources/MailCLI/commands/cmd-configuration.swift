@@ -9,6 +9,9 @@ struct ConfigurationOptions: Sendable, ArgumentGroup {
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
 
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
+
     init() {}
 }
 
@@ -74,9 +77,9 @@ enum CheckCommand: BoundArgumentCommand {
         _ options: ConfigurationOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        for (index, account) in accounts.accounts.enumerated() {
-            print("\(account.identifier)\(index == 0 ? " (default)" : ""): sending \(account.sending.rawValue)")
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        for (index, account) in access.visibleAccounts(in: accounts).enumerated() {
+            print("\(account.identifier)\(index == 0 ? " (default)" : ""): sending \(access.sending(for: account).rawValue)")
             for (role, server) in [("read", account.imap?.server), ("send", account.smtp?.server)] {
                 guard let server else {
                     continue
@@ -92,9 +95,12 @@ enum CheckCommand: BoundArgumentCommand {
                 }
                 print("  \(role)  \(server.host):\(server.port) \(EmailCLI.security(server.security)), \(login)")
             }
-            for identity in account.identities {
+            for identity in access.identities(of: account) {
                 print("  as    \(EmailCLI.display(identity.address))\(identity.signature == nil ? "" : ", signed")")
             }
+        }
+        for profile in accounts.profiles {
+            print("access \(profile.name): " + EmailCLI.describe(profile))
         }
     }
 }
@@ -115,16 +121,16 @@ enum AccountsCommand: BoundArgumentCommand {
         _ options: ConfigurationOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        for account in accounts.accounts {
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        for account in access.visibleAccounts(in: accounts) {
             print(account.identifier + (account.about.map { " — \($0)" } ?? ""))
             if let imap = account.imap?.server {
                 print("  read  \(imap.host):\(imap.port) \(EmailCLI.security(imap.security))")
             }
             if let smtp = account.smtp?.server {
-                print("  send  \(smtp.host):\(smtp.port) \(EmailCLI.security(smtp.security)), sending \(account.sending.rawValue)")
+                print("  send  \(smtp.host):\(smtp.port) \(EmailCLI.security(smtp.security)), sending \(access.sending(for: account).rawValue)")
             }
-            for identity in account.identities {
+            for identity in access.identities(of: account) {
                 print("  as    \(EmailCLI.display(identity.address))")
             }
         }
@@ -140,6 +146,16 @@ extension EmailCLI {
         case .startTLS: return "starttls"
         case .plaintext: return "plaintext"
         }
+    }
+
+    static func describe(
+        _ profile: MailAccess
+    ) -> String {
+        let accounts: String = profile.accounts?.joined(separator: ", ") ?? "all"
+        let mailboxes: String = profile.mailboxes?.joined(separator: ", ") ?? "all"
+        let identities: String = profile.identities?.sorted().joined(separator: ", ") ?? "all"
+        let writing: String = profile.maySend ? "may send" : (profile.mayDraft ? "drafts only" : "read only")
+        return "accounts \(accounts); mailboxes \(mailboxes); identities \(identities); \(writing)"
     }
 
     static func describe(

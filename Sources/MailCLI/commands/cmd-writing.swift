@@ -39,13 +39,18 @@ struct ComposeOptions: Sendable, ArgumentGroup {
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?
 
+    @Opt("access", help: "Limit to a named access profile from the configuration.")
+    var access: String?
+
     init() {}
 
     func compose(
-        in accounts: MailAccounts
+        in accounts: MailAccounts,
+        access: MailAccess
     ) throws -> (MailAccounts.Account, MailMessage) {
-        let account = try EmailCLI.account(self.account, in: accounts)
-        let identity = try identity(in: account)
+        try access.checkDrafting()
+        let account = try EmailCLI.account(self.account, in: accounts, access: access)
+        let identity = try identity(in: account, access: access)
         guard let subject, !subject.isEmpty else {
             throw EmailCLIError.missing("Give a --subject.")
         }
@@ -70,13 +75,21 @@ struct ComposeOptions: Sendable, ArgumentGroup {
     }
 
     private func identity(
-        in account: MailAccounts.Account
+        in account: MailAccounts.Account,
+        access: MailAccess
     ) throws -> MailIdentity {
+        let allowed = access.identities(of: account)
         guard let from, !from.isEmpty else {
-            return account.defaultIdentity
+            guard let identity = allowed.first else {
+                throw access.allows(identity: account.defaultIdentity.address.address.raw)
+                    ? EmailCLIError.missing("The account has no identities.")
+                    : MailAccess.Failure.identity(account.defaultIdentity.address.address.raw, profile: access.name)
+            }
+            return identity
         }
-        guard let identity = account.identities.first(where: { $0.address.address.raw.caseInsensitiveCompare(from) == .orderedSame }) else {
-            throw EmailCLIError.unknownIdentity(from, known: account.identities.map(\.address.address.raw))
+        try access.check(identity: from)
+        guard let identity = allowed.first(where: { $0.address.address.raw.caseInsensitiveCompare(from) == .orderedSame }) else {
+            throw EmailCLIError.unknownIdentity(from, known: allowed.map(\.address.address.raw))
         }
         return identity
     }
@@ -144,8 +157,8 @@ enum DraftCommand: BoundArgumentCommand {
         _ options: ComposeOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        let (account, message) = try options.compose(in: accounts)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        let (account, message) = try options.compose(in: accounts, access: access)
         let data = MailRenderer().data(message)
         let folder = try await EmailCLI.imap(account, in: accounts).session { session in
             let folder = try await EmailCLI.folder(.drafts, for: account, in: session) ?? "Drafts"
@@ -172,8 +185,9 @@ enum SendCommand: BoundArgumentCommand {
         _ options: ComposeOptions,
         invocation: ParsedInvocation
     ) async throws {
-        let accounts = try EmailCLI.accounts(directory: options.directory)
-        var (account, message) = try options.compose(in: accounts)
+        let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
+        try access.checkSending()
+        var (account, message) = try options.compose(in: accounts, access: access)
         guard let smtp = accounts.smtpClient(for: account) else {
             throw EmailCLIError.cannotSend(account.identifier)
         }

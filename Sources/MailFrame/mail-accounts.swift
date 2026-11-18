@@ -43,18 +43,45 @@ public struct MailAccounts: Sendable {
     /// In declaration order; the first is the default.
     public let accounts: [Account]
     public let credentials: any CredentialProvider
+    /// Access profiles in declaration order.
+    public let profiles: [MailAccess]
     private let routes: [CredentialReference: any CredentialProvider]
     private let sources: [CredentialReference: String]
 
     private init(
         accounts: [Account],
+        profiles: [MailAccess],
         routes: [CredentialReference: any CredentialProvider],
         sources: [CredentialReference: String]
     ) {
         self.accounts = accounts
+        self.profiles = profiles
         self.routes = routes
         self.sources = sources
         self.credentials = RoutedCredentialProvider(routes: routes)
+    }
+
+    /// The profile named `name`; `nil` means unrestricted.
+    public func access(
+        named name: String?
+    ) throws -> MailAccess {
+        guard let name, !name.isEmpty else {
+            return .unrestricted
+        }
+        guard let profile = profiles.first(where: { $0.name == name }) else {
+            throw MailAccess.Failure.unknownProfile(name, known: profiles.map(\.name))
+        }
+        return profile
+    }
+
+    /// Every profile names only declared accounts.
+    func validateProfiles() throws {
+        let known = Set(accounts.map(\.identifier))
+        for profile in profiles {
+            for name in profile.accounts ?? [] where !known.contains(name) {
+                throw Failure.invalid(field: "\(profile.name).accounts", reason: "no account named '\(name)'")
+            }
+        }
     }
 
     /// Where a password is read from, such as `env AWS_SMTP_PASSWD` or `keychain item personal`.
@@ -69,9 +96,16 @@ public struct MailAccounts: Sendable {
         _ parts: [MailAccounts]
     ) throws -> MailAccounts {
         var accounts: [Account] = []
+        var profiles: [MailAccess] = []
         var routes: [CredentialReference: any CredentialProvider] = [:]
         var sources: [CredentialReference: String] = [:]
         for part in parts {
+            for profile in part.profiles {
+                guard !profiles.contains(where: { $0.name == profile.name }) else {
+                    throw Failure.invalid(field: profile.name, reason: "an access profile with this name is declared in more than one file")
+                }
+                profiles.append(profile)
+            }
             for account in part.accounts {
                 guard !accounts.contains(where: { $0.identifier == account.identifier }) else {
                     throw Failure.invalid(field: account.identifier, reason: "an account with this name is declared in more than one file")
@@ -81,7 +115,9 @@ public struct MailAccounts: Sendable {
             routes.merge(part.routes) { first, _ in first }
             sources.merge(part.sources) { first, _ in first }
         }
-        return MailAccounts(accounts: accounts, routes: routes, sources: sources)
+        let merged = MailAccounts(accounts: accounts, profiles: profiles, routes: routes, sources: sources)
+        try merged.validateProfiles()
+        return merged
     }
 
     public var defaultAccount: Account? {
@@ -224,7 +260,37 @@ public struct MailAccounts: Sendable {
             ))
         }
 
-        self.init(accounts: accounts, routes: routes, sources: sources)
+        // Profiles may name accounts of other files; `merging` validates the names.
+        var profiles: [MailAccess] = []
+        for binding in document.bindings(ofType: "Access") {
+            let spec = try document.decode(MailFrame.Access.self, binding: binding.name)
+            let names = try spec.accounts.map { references in
+                try references.enumerated().map { index, reference -> String in
+                    switch reference {
+                    case .name(let name):
+                        return name
+                    case .account(let account):
+                        // A binding resolves to its value; find which account it was.
+                        guard let match = document.bindings(ofType: "Account").first(where: {
+                            (try? document.decode(MailFrame.Account.self, binding: $0.name)) == account
+                        }) else {
+                            throw Failure.invalid(field: "\(binding.name).accounts[\(index)]", reason: "not a declared account")
+                        }
+                        return match.name
+                    }
+                }
+            }
+            profiles.append(MailAccess(
+                name: binding.name,
+                accounts: names,
+                mailboxes: spec.mailboxes,
+                identities: spec.identities.map(Set.init),
+                mayDraft: spec.draft ?? true,
+                maySend: spec.send ?? true
+            ))
+        }
+
+        self.init(accounts: accounts, profiles: profiles, routes: routes, sources: sources)
     }
 
     private static func server(
