@@ -5,16 +5,19 @@ import Milieu
 public struct SMTPClient: Sendable {
     public let configuration: SMTPConfiguration
     public let credentials: (any CredentialProvider)?
+    public let connector: MailConnector
     public let renderer: MailRenderer
 
     public init(
         configuration: SMTPConfiguration,
         credentials: (any CredentialProvider)? = nil,
-        renderer: MailRenderer = MailRenderer()
+        renderer: MailRenderer = MailRenderer(),
+        connector: @escaping MailConnector = MailServerConfiguration.networkConnector
     ) {
         self.configuration = configuration
         self.credentials = credentials
         self.renderer = renderer
+        self.connector = connector
     }
 
     /// Renders and submits `message`; the envelope sender is `message.from`.
@@ -23,7 +26,7 @@ public struct SMTPClient: Sendable {
         _ message: MailMessage
     ) async throws -> SMTPDelivery {
         let resolved = try await configuration.server.resolveCredentials(using: credentials)
-        let transport = try await configuration.server.connect()
+        let transport = try await connector(configuration.server)
 
         do {
             let delivery = try await SMTPSession(

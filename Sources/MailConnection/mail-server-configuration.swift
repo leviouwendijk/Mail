@@ -42,7 +42,13 @@ public struct MailCredentials: Sendable {
     }
 }
 
+/// Opens a transport to a server; replaceable so sessions can run against a scripted server.
+public typealias MailConnector = @Sendable (MailServerConfiguration) async throws -> any MailTransport
+
 public struct MailServerConfiguration: Sendable {
+    /// The real network connection.
+    public static let networkConnector: MailConnector = { try await $0.connect() }
+
     public var host: String
     public var port: UInt16
     public var security: MailSecurity

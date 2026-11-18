@@ -63,15 +63,17 @@ public struct MailAccounts: Sendable {
     }
 
     public func smtpClient(
-        for account: Account
+        for account: Account,
+        connector: @escaping MailConnector = MailServerConfiguration.networkConnector
     ) -> SMTPClient? {
-        account.smtp.map { SMTPClient(configuration: $0, credentials: credentials) }
+        account.smtp.map { SMTPClient(configuration: $0, credentials: credentials, connector: connector) }
     }
 
     public func imapClient(
-        for account: Account
+        for account: Account,
+        connector: @escaping MailConnector = MailServerConfiguration.networkConnector
     ) -> IMAPClient? {
-        account.imap.map { IMAPClient(configuration: $0, credentials: credentials) }
+        account.imap.map { IMAPClient(configuration: $0, credentials: credentials, connector: connector) }
     }
 
     /// Reads `url`; `nil` when the file is missing or empty.

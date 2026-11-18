@@ -33,13 +33,16 @@ public struct IMAPConfiguration: Sendable {
 public struct IMAPClient: Sendable {
     public let configuration: IMAPConfiguration
     public let credentials: (any CredentialProvider)?
+    public let connector: MailConnector
 
     public init(
         configuration: IMAPConfiguration,
-        credentials: (any CredentialProvider)? = nil
+        credentials: (any CredentialProvider)? = nil,
+        connector: @escaping MailConnector = MailServerConfiguration.networkConnector
     ) {
         self.configuration = configuration
         self.credentials = credentials
+        self.connector = connector
     }
 
     /// Connects, authenticates, runs `body` and logs out.
@@ -47,7 +50,7 @@ public struct IMAPClient: Sendable {
         _ body: (IMAPSession) async throws -> T
     ) async throws -> T {
         let resolved = try await configuration.server.resolveCredentials(using: credentials)
-        let transport = try await configuration.server.connect()
+        let transport = try await connector(configuration.server)
         let session = IMAPSession(transport: transport)
 
         do {
