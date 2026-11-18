@@ -19,6 +19,8 @@ public extension MailFrame {
 
         // A send-only provider read from the environment, such as Amazon SES:
         // host, port and username may be `.{ .env = "…" }` like the password.
+        // A server may also carry its own username and password, so one
+        // account can read from a mailbox host and send through SES.
         let ses: Provider = .{
             .smtp = .{
                 .host = .{ .env = "AWS_SES_HOST" },

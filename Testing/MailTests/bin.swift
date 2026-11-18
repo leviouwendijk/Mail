@@ -97,6 +97,9 @@ enum MailTestSuite {
         Test("frame-settings-from-environment") {
             try await FrameTests.environmentSettings()
         }
+        Test("frame-split-server-logins") {
+            try await FrameTests.splitServers()
+        }
         Test("frame-rejects-invalid") {
             try FrameTests.invalid()
         }

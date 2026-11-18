@@ -74,6 +74,9 @@ public enum MailFrame {
         public let host: Setting<String>
         public let port: Setting<Int>?
         public let security: Security?
+        /// This server's own login, when it differs from the account's.
+        public let username: Setting<String>?
+        public let password: Secret?
     }
 
     public struct Provider: Sendable, Hashable, Decodable {
@@ -108,8 +111,8 @@ public enum MailFrame {
 
     public struct Account: Sendable, Hashable, Decodable {
         public let provider: Provider
-        public let username: Setting<String>
-        public let password: Secret
+        public let username: Setting<String>?
+        public let password: Secret?
         public let identities: [Identity]
         public let folders: Folders?
         public let sending: Sending?
@@ -127,6 +130,8 @@ extension MailFrame.Server: FrameDescribable {
                 .starttls: "Plain connection upgraded with STARTTLS before login, as iCloud's SMTP requires. Refused if the server does not offer it.",
                 .plaintext: "No encryption; only for a local relay. Refuses to send a password.",
             ]), summary: "How the connection is protected."),
+            .init("username", .any, summary: "This server's login when it differs from the account's, such as SES SMTP credentials next to a mailbox host's IMAP login."),
+            .init("password", .of(MailFrame.Secret.self), summary: "This server's password when it differs from the account's."),
         ], summary: "A mail server.")
     }
 }
@@ -185,8 +190,8 @@ extension MailFrame.Account: FrameDescribable {
     public static var frameSchema: Frame.Schema {
         .object([
             .init("provider", .of(MailFrame.Provider.self), required: true),
-            .init("username", .any, required: true, summary: "The login name, often the address; or .{ .env = \"VARIABLE\" } to keep it out of the file."),
-            .init("password", .of(MailFrame.Secret.self), required: true, summary: "An app password, by reference."),
+            .init("username", .any, summary: "The login name, often the address; or .{ .env = \"VARIABLE\" }. Used by every server that sets none of its own."),
+            .init("password", .of(MailFrame.Secret.self), summary: "An app password, by reference. Used by every server that sets none of its own."),
             .init("identities", .array(.of(MailFrame.Identity.self)), required: true, summary: "Addresses this account sends as; the first is the default."),
             .init("folders", .of(MailFrame.Folders.self)),
             .init("sending", .members(of: MailFrame.Sending.self, summaries: [

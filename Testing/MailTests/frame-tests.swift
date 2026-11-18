@@ -57,7 +57,7 @@ enum FrameTests {
         try Expect.isNil(ses.imap, "Send-only")
         try Expect.equal(ses.smtp?.server.host, "email-smtp.eu-north-1.amazonaws.com", "Host from env")
         try Expect.equal(ses.smtp?.server.port, 465, "Port from env")
-        try Expect.equal(ses.username, "AKIAEXAMPLE", "Username from env")
+        try Expect.equal(ses.smtp?.server.authentication?.username, "AKIAEXAMPLE", "Username from env")
         let password = try await accounts.credentials.resolve(ses.smtp!.server.authentication!.password).utf8()
         try Expect.equal(password, "ses-secret", "Password from env at connect time")
 
@@ -74,6 +74,47 @@ enum FrameTests {
         badPort["AWS_SES_PORT"] = "smtp"
         try Expect.throwsError("Port variable must be a number") {
             _ = try MailAccounts(source: MailFrame.example, environment: badPort)
+        }
+    }
+
+    /// Reading from a mailbox host and sending through SES, with different logins.
+    static func splitServers() async throws {
+        let accounts = try MailAccounts(source: """
+            import Mail;
+            let mail: Account = .{
+                .provider = .{
+                    .imap = .{ .host = "imap.mailhost.example" },
+                    .smtp = .{
+                        .host = .{ .env = "AWS_SES_HOST" },
+                        .username = .{ .env = "AWS_SMTP_USER" },
+                        .password = .{ .env = "AWS_SMTP_PASSWD" },
+                    },
+                },
+                .username = "levi@hondenmeesters.nl",
+                .password = .{ .env = "MAILHOST_PASSWORD" },
+                .identities = [.{ .address = "levi@hondenmeesters.nl" }],
+            };
+            """, environment: environment.merging(["MAILHOST_PASSWORD": "imap-secret"]) { $1 })
+
+        let account = try Expect.notNil(accounts.defaultAccount, "Account")
+        let imap = try Expect.notNil(account.imap?.server.authentication, "IMAP login")
+        let smtp = try Expect.notNil(account.smtp?.server.authentication, "SMTP login")
+        try Expect.equal(imap.username, "levi@hondenmeesters.nl", "IMAP uses the account login")
+        try Expect.equal(smtp.username, "AKIAEXAMPLE", "SMTP uses its own login")
+        try Expect.equal(try await accounts.credentials.resolve(imap.password).utf8(), "imap-secret", "IMAP password")
+        try Expect.equal(try await accounts.credentials.resolve(smtp.password).utf8(), "ses-secret", "SMTP password")
+
+        do {
+            _ = try MailAccounts(source: """
+                import Mail;
+                let a: Account = .{
+                    .provider = .{ .smtp = .{ .host = "smtp.example.org", .username = "u" } },
+                    .identities = [.{ .address = "a@example.org" }],
+                };
+                """)
+            throw TestFlowAssertionFailure(label: "no-password", message: "a server without any password should be refused")
+        } catch let failure as MailAccounts.Failure {
+            try Expect.contains(failure.localizedDescription, "a.provider.smtp.password", "Names the server")
         }
     }
 

@@ -24,7 +24,6 @@ public struct MailAccounts: Sendable {
     public struct Account: Sendable {
         /// The binding name.
         public let identifier: String
-        public let username: String
         public let smtp: SMTPConfiguration?
         public let imap: IMAPConfiguration?
         /// The first is the default.
@@ -43,14 +42,24 @@ public struct MailAccounts: Sendable {
     public let accounts: [Account]
     public let credentials: any CredentialProvider
     private let routes: [CredentialReference: any CredentialProvider]
+    private let sources: [CredentialReference: String]
 
     private init(
         accounts: [Account],
-        routes: [CredentialReference: any CredentialProvider]
+        routes: [CredentialReference: any CredentialProvider],
+        sources: [CredentialReference: String]
     ) {
         self.accounts = accounts
         self.routes = routes
+        self.sources = sources
         self.credentials = RoutedCredentialProvider(routes: routes)
+    }
+
+    /// Where a password is read from, such as `env AWS_SMTP_PASSWD` or `keychain item personal`.
+    public func source(
+        of reference: CredentialReference
+    ) -> String {
+        sources[reference] ?? reference.id
     }
 
     /// Accounts from several files, in order; a binding name may appear once.
@@ -59,6 +68,7 @@ public struct MailAccounts: Sendable {
     ) throws -> MailAccounts {
         var accounts: [Account] = []
         var routes: [CredentialReference: any CredentialProvider] = [:]
+        var sources: [CredentialReference: String] = [:]
         for part in parts {
             for account in part.accounts {
                 guard !accounts.contains(where: { $0.identifier == account.identifier }) else {
@@ -67,8 +77,9 @@ public struct MailAccounts: Sendable {
                 accounts.append(account)
             }
             routes.merge(part.routes) { first, _ in first }
+            sources.merge(part.sources) { first, _ in first }
         }
-        return MailAccounts(accounts: accounts, routes: routes)
+        return MailAccounts(accounts: accounts, routes: routes, sources: sources)
     }
 
     public var defaultAccount: Account? {
@@ -138,40 +149,57 @@ public struct MailAccounts: Sendable {
     ) throws {
         var accounts: [Account] = []
         var routes: [CredentialReference: any CredentialProvider] = [:]
+        var sources: [CredentialReference: String] = [:]
         let keychain = KeychainCredentialProvider(service: keychainService)
 
         for binding in document.bindings(ofType: "Account") {
             let field = binding.name
             let spec = try document.decode(MailFrame.Account.self, binding: field)
 
-            let reference: CredentialReference
-            switch (spec.password.env.flatMap(Self.nonEmpty), spec.password.keychain.flatMap(Self.nonEmpty)) {
-            case (let variable?, nil):
-                reference = CredentialReference("mail.\(field).password")
-                routes[reference] = EnvironmentCredentialProvider(symbols: [reference: variable], environment: environment)
-            case (nil, let item?):
-                reference = CredentialReference(item)
-                routes[reference] = keychain
-            default:
-                throw Failure.invalid(field: "\(field).password", reason: "set exactly one of env or keychain")
+            /// The server's own login, else the account's; each part falls back separately.
+            func authentication(
+                for server: MailFrame.Server,
+                role: String
+            ) throws -> MailAuthentication {
+                let at = "\(field).provider.\(role)"
+                guard let usernameSetting = server.username ?? spec.username else {
+                    throw Failure.invalid(field: "\(at).username", reason: "set username on the account or on this server")
+                }
+                guard let username = usernameSetting.resolve(in: environment).flatMap(Self.nonEmpty) else {
+                    throw Failure.invalid(field: server.username == nil ? "\(field).username" : "\(at).username", reason: Self.unset(usernameSetting))
+                }
+                guard let secret = server.password ?? spec.password else {
+                    throw Failure.invalid(field: "\(at).password", reason: "set password on the account or on this server")
+                }
+                let owner = server.password == nil ? field : "\(field).\(role)"
+                let reference: CredentialReference
+                switch (secret.env.flatMap(Self.nonEmpty), secret.keychain.flatMap(Self.nonEmpty)) {
+                case (let variable?, nil):
+                    reference = CredentialReference("mail.\(owner).password")
+                    routes[reference] = EnvironmentCredentialProvider(symbols: [reference: variable], environment: environment)
+                    sources[reference] = "env \(variable)"
+                case (nil, let item?):
+                    reference = CredentialReference(item)
+                    routes[reference] = keychain
+                    sources[reference] = "keychain item \(item) (service \(keychainService))"
+                default:
+                    throw Failure.invalid(field: "\(owner).password", reason: "set exactly one of env or keychain")
+                }
+                return MailAuthentication(username: username, password: reference)
             }
-            guard let username = spec.username.resolve(in: environment).flatMap(Self.nonEmpty) else {
-                throw Failure.invalid(field: "\(field).username", reason: Self.unset(spec.username))
-            }
-            let authentication = MailAuthentication(username: username, password: reference)
 
             guard spec.provider.smtp != nil || spec.provider.imap != nil else {
                 throw Failure.invalid(field: "\(field).provider", reason: "set smtp, imap or both")
             }
             let smtp = try spec.provider.smtp.map { server in
                 SMTPConfiguration(
-                    server: try Self.server(server, defaultPorts: (465, 587), authentication: authentication, environment: environment, at: "\(field).provider.smtp"),
+                    server: try Self.server(server, defaultPorts: (465, 587), authentication: authentication(for: server, role: "smtp"), environment: environment, at: "\(field).provider.smtp"),
                     clientName: Self.clientName(spec.identities.first?.address)
                 )
             }
             let imap = try spec.provider.imap.map { server in
                 IMAPConfiguration(
-                    server: try Self.server(server, defaultPorts: (993, 143), authentication: authentication, environment: environment, at: "\(field).provider.imap")
+                    server: try Self.server(server, defaultPorts: (993, 143), authentication: authentication(for: server, role: "imap"), environment: environment, at: "\(field).provider.imap")
                 )
             }
 
@@ -184,7 +212,6 @@ public struct MailAccounts: Sendable {
 
             accounts.append(Account(
                 identifier: field,
-                username: username,
                 smtp: smtp,
                 imap: imap,
                 identities: identities,
@@ -194,7 +221,7 @@ public struct MailAccounts: Sendable {
             ))
         }
 
-        self.init(accounts: accounts, routes: routes)
+        self.init(accounts: accounts, routes: routes, sources: sources)
     }
 
     private static func server(

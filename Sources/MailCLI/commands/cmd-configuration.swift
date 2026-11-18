@@ -76,20 +76,24 @@ enum CheckCommand: BoundArgumentCommand {
     ) async throws {
         let accounts = try EmailCLI.accounts(directory: options.directory)
         for (index, account) in accounts.accounts.enumerated() {
-            let server = account.imap?.server ?? account.smtp?.server
-            var password = "no login"
-            if let reference = server?.authentication?.password {
-                do {
-                    _ = try await accounts.credentials.resolve(reference).utf8()
-                    password = "password resolves"
-                } catch {
-                    password = "password MISSING (\(EmailCLI.describe(error)))"
+            print("\(account.identifier)\(index == 0 ? " (default)" : ""): sending \(account.sending.rawValue)")
+            for (role, server) in [("read", account.imap?.server), ("send", account.smtp?.server)] {
+                guard let server else {
+                    continue
                 }
+                var login = "no login"
+                if let authentication = server.authentication {
+                    do {
+                        _ = try await accounts.credentials.resolve(authentication.password).utf8()
+                        login = "\(authentication.username), password resolves"
+                    } catch {
+                        login = "\(authentication.username), password MISSING from \(accounts.source(of: authentication.password))"
+                    }
+                }
+                print("  \(role)  \(server.host):\(server.port) \(EmailCLI.security(server.security)), \(login)")
             }
-            let roles = [account.imap.map { _ in "read" }, account.smtp.map { _ in "send" }].compactMap { $0 }
-            print("\(account.identifier)\(index == 0 ? " (default)" : ""): \(roles.joined(separator: "+")), sending \(account.sending.rawValue), \(password)")
             for identity in account.identities {
-                print("  as \(EmailCLI.display(identity.address))\(identity.signature == nil ? "" : ", signed")")
+                print("  as    \(EmailCLI.display(identity.address))\(identity.signature == nil ? "" : ", signed")")
             }
         }
     }
