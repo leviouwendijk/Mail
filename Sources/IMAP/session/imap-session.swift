@@ -42,6 +42,11 @@ public actor IMAPSession {
         return greeting.status == "PREAUTH"
     }
 
+    /// Gmail's search syntax, thread IDs and labels.
+    public var supportsGmailExtensions: Bool {
+        hasCapability("X-GM-EXT-1")
+    }
+
     public func hasCapability(
         _ name: String
     ) -> Bool {
@@ -160,6 +165,9 @@ public actor IMAPSession {
     public func search(
         _ query: IMAPSearch
     ) async throws -> [IMAPUID] {
+        if query.usesGmailExtensions && !supportsGmailExtensions {
+            throw IMAPError.unsupported(capability: "X-GM-EXT-1")
+        }
         var parts: [IMAPCommandPart] = [.text("UID SEARCH")]
         if query.needsUTF8 {
             parts.append(.text("CHARSET UTF-8"))
@@ -180,7 +188,13 @@ public actor IMAPSession {
         guard !uids.isEmpty else {
             return []
         }
-        let items = try await fetch(uids, items: "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)")
+        let gmail = supportsGmailExtensions
+        let items = try await fetch(
+            uids,
+            items: gmail
+                ? "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE X-GM-THRID X-GM-MSGID X-GM-LABELS)"
+                : "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)"
+        )
         return try items.compactMap { values -> IMAPMessageSummary? in
             guard let uid = values["UID"]?.number else {
                 return nil
@@ -190,7 +204,14 @@ public actor IMAPSession {
                 flags: Set((values["FLAGS"]?.list ?? []).compactMap(\.text).map { IMAPFlag($0) }),
                 internalDate: values["INTERNALDATE"]?.text.flatMap(MailDate.parseInternal),
                 size: values["RFC822.SIZE"]?.number,
-                envelope: try values["ENVELOPE"].map(IMAPEnvelope.init)
+                envelope: try values["ENVELOPE"].map(IMAPEnvelope.init),
+                gmail: gmail ? IMAPGmailAttributes(
+                    threadID: values["X-GM-THRID"]?.text,
+                    messageID: values["X-GM-MSGID"]?.text,
+                    labels: (values["X-GM-LABELS"]?.list ?? []).compactMap(\.text).map { label in
+                        label.hasPrefix("\\") ? label : IMAPMailboxName.decode(label)
+                    }
+                ) : nil
             )
         }
         .sorted { $0.uid < $1.uid }

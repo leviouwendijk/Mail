@@ -144,6 +144,10 @@ enum SearchCommand: BoundArgumentCommand {
             let from = summary.envelope?.from.first.map(EmailCLI.display) ?? ""
             let date = EmailCLI.shortDate(summary.envelope?.date ?? summary.internalDate)
             print("\(marker) \(String(summary.uid.rawValue).padding(toLength: 7, withPad: " ", startingAt: 0)) \(date)  \(from)\n            \(summary.envelope?.subject ?? "(no subject)")")
+            if let gmail = summary.gmail {
+                let labels = gmail.labels.isEmpty ? "" : "  labels: \(gmail.labels.joined(separator: ", "))"
+                print("            thread \(gmail.threadID ?? "?")\(labels)")
+            }
         }
         FileHandle.standardError.write(Data("\(summaries.count) of \(total) in \(options.mailbox)\n".utf8))
     }
@@ -180,6 +184,12 @@ struct SearchOptions: Sendable, ArgumentGroup {
     @Opt("before", help: "Received before, yyyy-MM-dd.")
     var before: String?
 
+    @Opt("gmail", short: "g", help: "Gmail search syntax, such as 'has:attachment older_than:7d' (Gmail only).")
+    var gmail: String?
+
+    @Opt("thread", help: "Every message of a Gmail conversation, by thread ID (Gmail only).")
+    var thread: String?
+
     @Opt("limit", short: "n", default: 20, help: "Most recent matches to show.")
     var limit: Int
 
@@ -198,6 +208,8 @@ struct SearchOptions: Sendable, ArgumentGroup {
         if let text { criteria.append(.text(text)) }
         if let since { criteria.append(.since(try EmailCLI.day(since))) }
         if let before { criteria.append(.before(try EmailCLI.day(before))) }
+        if let gmail { criteria.append(.gmail(gmail)) }
+        if let thread { criteria.append(.gmailThread(thread)) }
         return .and(criteria)
     }
 }

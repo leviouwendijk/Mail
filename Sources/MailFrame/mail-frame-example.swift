@@ -28,6 +28,15 @@ public extension MailFrame {
             },
         };
 
+        // Gmail with an app password (myaccount.google.com/apppasswords). It files
+        // sent mail itself, so no copy is saved; its search syntax, threads and
+        // labels are used automatically.
+        let gmail: Provider = .{
+            .smtp = .{ .host = "smtp.gmail.com" },
+            .imap = .{ .host = "imap.gmail.com" },
+            .features = .{ .savesSentMail = true },
+        };
+
         let practice: Identity = .{
             .address = "alex@practice.example",
             .name = "Alex Example",
@@ -54,6 +63,13 @@ public extension MailFrame {
             .username = "alex@icloud.com",
             .password = .{ .keychain = "personal" },
             .identities = [.{ .address = "alex@icloud.com", .name = "Alex" }],
+        };
+
+        let google: Account = .{
+            .provider = gmail,
+            .username = "alex@gmail.com",
+            .password = .{ .env = "GMAIL_APP_PASSWORD" },
+            .identities = [.{ .address = "alex@gmail.com", .name = "Alex" }],
         };
 
         // SES sends only as verified identities; it has no IMAP, so no Sent copy.

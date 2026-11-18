@@ -52,12 +52,34 @@ public struct IMAPEnvelope: Sendable, Equatable {
     }
 }
 
+/// Gmail's conversation and label data (`X-GM-EXT-1`).
+public struct IMAPGmailAttributes: Sendable, Equatable {
+    /// The conversation's ID; pass to `IMAPSearch.gmailThread`.
+    public let threadID: String?
+    /// Gmail's own stable message ID.
+    public let messageID: String?
+    /// Labels, decoded; system labels keep their backslash, such as `\Important`.
+    public let labels: [String]
+
+    public init(
+        threadID: String?,
+        messageID: String?,
+        labels: [String]
+    ) {
+        self.threadID = threadID
+        self.messageID = messageID
+        self.labels = labels
+    }
+}
+
 public struct IMAPMessageSummary: Sendable, Equatable {
     public let uid: IMAPUID
     public let flags: Set<IMAPFlag>
     public let internalDate: Date?
     public let size: Int?
     public let envelope: IMAPEnvelope?
+    /// Present on Gmail servers.
+    public let gmail: IMAPGmailAttributes?
 
     public var isUnread: Bool {
         !flags.contains(.seen)

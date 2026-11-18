@@ -53,6 +53,11 @@ public indirect enum IMAPSearch: Sendable, Equatable {
     case smaller(Int)
     case uids([IMAPUID])
 
+    /// Gmail's own search syntax, such as `has:attachment older_than:7d` (needs `X-GM-EXT-1`).
+    case gmail(String)
+    /// Every message of a Gmail conversation, by its `X-GM-THRID` (needs `X-GM-EXT-1`).
+    case gmailThread(String)
+
     case and([IMAPSearch])
     case or(IMAPSearch, IMAPSearch)
     case not(IMAPSearch)
@@ -121,6 +126,22 @@ public indirect enum IMAPSearch: Sendable, Equatable {
         return .not(operand)
     }
 
+    /// Whether the query uses Gmail extensions, which only Gmail servers accept.
+    public var usesGmailExtensions: Bool {
+        switch self {
+        case .gmail, .gmailThread:
+            return true
+        case .and(let criteria):
+            return criteria.contains(where: \.usesGmailExtensions)
+        case .or(let lhs, let rhs):
+            return lhs.usesGmailExtensions || rhs.usesGmailExtensions
+        case .not(let operand):
+            return operand.usesGmailExtensions
+        default:
+            return false
+        }
+    }
+
     /// Whether rendering needs `CHARSET UTF-8`.
     public var needsUTF8: Bool {
         arguments().contains(where: \.isLiteral)
@@ -171,6 +192,8 @@ public indirect enum IMAPSearch: Sendable, Equatable {
         case .larger(let size): return [.text("LARGER"), .text(String(size))]
         case .smaller(let size): return [.text("SMALLER"), .text(String(size))]
         case .uids(let uids): return [.text("UID"), .text(uids.isEmpty ? "0" : IMAPUID.set(uids))]
+        case .gmail(let query): return string("X-GM-RAW", query)
+        case .gmailThread(let thread): return [.text("X-GM-THRID"), .text(thread.filter(\.isNumber))]
 
         case .and(let criteria):
             guard !criteria.isEmpty else {

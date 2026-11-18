@@ -31,6 +31,8 @@ public struct MailAccounts: Sendable {
         /// Folder names by role, where the file sets them.
         public let folders: [IMAPSpecialUse: String]
         public let sending: MailFrame.Sending
+        /// The provider files sent mail itself; skip saving a copy after sending.
+        public let savesSentMail: Bool
         public let about: String?
 
         public var defaultIdentity: MailIdentity {
@@ -217,6 +219,7 @@ public struct MailAccounts: Sendable {
                 identities: identities,
                 folders: Self.folders(spec.folders),
                 sending: spec.sending ?? .drafts,
+                savesSentMail: spec.provider.features?.savesSentMail ?? false,
                 about: spec.about.flatMap(Self.nonEmpty)
             ))
         }

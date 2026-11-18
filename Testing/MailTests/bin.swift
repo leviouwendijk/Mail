@@ -85,6 +85,15 @@ enum MailTestSuite {
         Test("readable-text-from-html") {
             try IMAPWriteTests.readableText()
         }
+        Test("gmail-search-syntax-and-threads") {
+            try GmailTests.queries()
+        }
+        Test("gmail-syntax-refused-on-other-servers") {
+            try await GmailTests.refusedElsewhere()
+        }
+        Test("gmail-thread-ids-and-labels") {
+            try await GmailTests.threadsAndLabels()
+        }
         Test("imap-command-failure") {
             try await IMAPTests.failure()
         }

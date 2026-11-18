@@ -192,7 +192,9 @@ enum SendCommand: BoundArgumentCommand {
             print("Refused \(rejection.recipient.raw): \(rejection.reply)")
         }
 
-        if let imap = accounts.imapClient(for: account) {
+        if account.savesSentMail {
+            print("The provider files sent mail itself; no copy saved.")
+        } else if let imap = accounts.imapClient(for: account) {
             let data = MailRenderer().data(message)
             do {
                 let folder = try await imap.session { session -> String? in

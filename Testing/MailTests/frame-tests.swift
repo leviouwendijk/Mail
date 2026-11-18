@@ -13,6 +13,7 @@ enum FrameTests {
         "AWS_SES_PORT": "465",
         "AWS_SMTP_USER": "AKIAEXAMPLE",
         "AWS_SMTP_PASSWD": "ses-secret",
+        "GMAIL_APP_PASSWORD": "gmail-app-password",
     ]
 
     static func example() async throws {
@@ -21,9 +22,11 @@ enum FrameTests {
             environment: environment
         )
 
-        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal", "transactional", "office"], "Accounts in order")
+        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal", "google", "transactional", "office"], "Accounts in order")
+        try Expect.true(try Expect.notNil(accounts.account(named: "google"), "Gmail").savesSentMail, "Gmail files sent mail itself")
         let work = try Expect.notNil(accounts.defaultAccount, "Default account")
         try Expect.equal(work.identifier, "work", "First is default")
+        try Expect.false(work.savesSentMail, "Others save a copy")
         try Expect.equal(work.identities.map(\.address.address.raw), ["alex@practice.example", "info@practice.example"], "Identities")
         try Expect.equal(work.sending, .confirm, "Sending policy")
         try Expect.equal(work.folders[.archive], "Archive", "Folder override")

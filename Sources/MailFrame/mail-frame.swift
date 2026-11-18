@@ -10,6 +10,7 @@ public enum MailFrame {
     public static let module = Frame.Module("Mail", types: [
         .decodable(Server.self, named: "Server"),
         .decodable(Provider.self, named: "Provider"),
+        .decodable(Features.self, named: "Features"),
         .decodable(Secret.self, named: "Secret"),
         .decodable(Signature.self, named: "Signature"),
         .decodable(Identity.self, named: "Identity"),
@@ -79,9 +80,17 @@ public enum MailFrame {
         public let password: Secret?
     }
 
+    /// How a provider behaves beyond the protocols.
+    public struct Features: Sendable, Hashable, Decodable {
+        /// The provider files submitted mail in Sent itself (Gmail, Outlook);
+        /// clients then skip saving their own copy.
+        public let savesSentMail: Bool?
+    }
+
     public struct Provider: Sendable, Hashable, Decodable {
         public let smtp: Server?
         public let imap: Server?
+        public let features: Features?
     }
 
     public struct Secret: Sendable, Hashable, Decodable {
@@ -141,7 +150,16 @@ extension MailFrame.Provider: FrameDescribable {
         .object([
             .init("smtp", .of(MailFrame.Server.self), summary: "Where mail is submitted. Absent means the account cannot send."),
             .init("imap", .of(MailFrame.Server.self), summary: "Where mail is read. Absent means the account cannot be searched."),
+            .init("features", .of(MailFrame.Features.self), summary: "How the provider behaves beyond the protocols."),
         ], summary: "A mail host's servers, shared by its accounts.")
+    }
+}
+
+extension MailFrame.Features: FrameDescribable {
+    public static var frameSchema: Frame.Schema {
+        .object([
+            .init("savesSentMail", .boolean, summary: "The provider files submitted mail in Sent itself, as Gmail does; no copy is saved after sending. False when absent."),
+        ], summary: "Provider behaviour beyond the protocols. Gmail's search syntax, threads and labels need no setting: they follow from the server's capabilities.")
     }
 }
 

@@ -228,3 +228,47 @@ enum IMAPWriteTests {
         )
     }
 }
+
+enum GmailTests {
+    static func queries() throws {
+        let query = IMAPSearch.unread && .gmail("has:attachment older_than:7d")
+        try Expect.equal(query.arguments().preview, "UNSEEN X-GM-RAW \"has:attachment older_than:7d\"", "Raw Gmail syntax quoted")
+        try Expect.true(query.usesGmailExtensions, "Detected in a conjunction")
+        try Expect.equal(IMAPSearch.gmailThread("1278455344230334865").arguments().preview, "X-GM-THRID 1278455344230334865", "Thread search")
+        try Expect.false((IMAPSearch.unread || .from("jan")).usesGmailExtensions, "Plain IMAP")
+    }
+
+    static func refusedElsewhere() async throws {
+        let transport = ScriptedTransport(["* OK ready", "* CAPABILITY IMAP4rev1", "A1 OK done"])
+        let session = IMAPSession(transport: transport)
+        try await session.start()
+        do {
+            _ = try await session.search(.gmail("is:starred"))
+            throw TestFlowAssertionFailure(label: "gmail", message: "a non-Gmail server must not receive X-GM-RAW")
+        } catch IMAPError.unsupported(let capability) {
+            try Expect.equal(capability, "X-GM-EXT-1", "Names the capability")
+        }
+        try Expect.equal(await transport.commands(), ["A1 CAPABILITY"], "Nothing sent")
+    }
+
+    static func threadsAndLabels() async throws {
+        let transport = ScriptedTransport([
+            "* OK Gimap ready",
+            "* CAPABILITY IMAP4rev1 X-GM-EXT-1 UIDPLUS",
+            "A1 OK done",
+            "* 3 FETCH (X-GM-THRID 1278455344230334865 X-GM-MSGID 1278455344230334866 X-GM-LABELS (\\Important \"Klanten/Entw&APw-rfe\") UID 9 FLAGS (\\Seen) ENVELOPE (NIL \"Hoi\" NIL NIL NIL NIL NIL NIL NIL NIL))",
+            "A2 OK done",
+        ])
+        let session = IMAPSession(transport: transport)
+        try await session.start()
+        let summaries = try await session.summaries([IMAPUID(9)])
+        let gmail = try Expect.notNil(summaries.first?.gmail, "Gmail attributes")
+        try Expect.equal(gmail.threadID, "1278455344230334865", "Thread ID")
+        try Expect.equal(gmail.messageID, "1278455344230334866", "Gmail message ID")
+        try Expect.equal(gmail.labels, ["\\Important", "Klanten/Entwürfe"], "System and decoded user labels")
+        try Expect.true(
+            await transport.commands().contains("A2 UID FETCH 9 (UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE X-GM-THRID X-GM-MSGID X-GM-LABELS)"),
+            "Fetches Gmail items only on Gmail"
+        )
+    }
+}
