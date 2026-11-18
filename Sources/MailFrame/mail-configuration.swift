@@ -1,10 +1,14 @@
 import Foundation
+import Frame
 import IO
 import Readers
 
 /// Where mail configuration lives by default: every `*.frame` file in
-/// `$XDG_CONFIG_HOME/mail`, or `~/.config/mail`, read in name order. Each file
-/// starts with `import Mail;`; account names must be unique across files.
+/// `$XDG_CONFIG_HOME/mail`, or `~/.config/mail`, under any names. Each file
+/// starts with `import Mail;`; together they form one configuration, so a
+/// binding may reference one declared in another file, in any order. Names
+/// must be unique across files; accounts keep file-name order, so the
+/// default account is the first in the first file that declares one.
 public enum MailConfiguration {
     public enum State: Sendable {
         case loaded(MailAccounts)
@@ -49,19 +53,62 @@ public enum MailConfiguration {
             return .missing(directory: directory.path)
         }
 
-        var parts: [MailAccounts] = []
+        // Every file is parsed on its own; each is then checked with all the
+        // others' bindings in scope, so references cross files in any order.
+        var parsed: [(file: URL, source: String, document: Frame.Document)] = []
+        var bindings: [Frame.Binding] = []
+        var imports: [Frame.Import] = []
+        var origin: [String: URL] = [:]
         for file in files {
             do {
                 let source = try TextFileReader(file).read().text
-                parts.append(try MailAccounts(source: source, filePath: file.path, environment: environment))
+                let document = try Frame.parse(source, filePath: file.path)
+                parsed.append((file, source, document))
+                for binding in document.bindings {
+                    if let first = origin[binding.name] {
+                        return .invalid(file: file.path, message: "'\(binding.name)' is also declared in \(first.lastPathComponent); names must be unique across files.")
+                    }
+                    origin[binding.name] = file
+                }
+                bindings += document.bindings
+                imports += document.imports
             } catch {
                 return .invalid(file: file.path, message: describe(error))
             }
         }
+        // Every failing file is reported: a missing name also fails the files
+        // that reach it through a reference, and the declaring file may be any of them.
+        var failures: [(file: URL, message: String)] = []
+        for (file, source, document) in parsed {
+            do {
+                try Frame.check(document, in: MailFrame.environment, context: bindings)
+            } catch let failure as Frame.TypeFailure {
+                failures.append((file, failure.located(in: source).description))
+            } catch {
+                failures.append((file, describe(error)))
+            }
+        }
+        if let first = failures.first {
+            let others = failures.dropFirst().map { "\n\($0.file.path): \($0.message)" }.joined()
+            return .invalid(file: first.file.path, message: first.message + others)
+        }
+
         do {
-            return .loaded(try MailAccounts.merging(parts))
+            let accounts = try MailAccounts(
+                document: Frame.Document(imports: imports, bindings: bindings),
+                environment: environment
+            )
+            try accounts.validateProfiles()
+            return .loaded(accounts)
         } catch {
-            return .invalid(file: directory.path, message: describe(error))
+            // Fields start with their binding's name; report the file that declares it.
+            let field: String? = {
+                if case .invalid(let field, _) = error as? MailAccounts.Failure { return field }
+                return nil
+            }()
+            let binding = field.flatMap { $0.split(whereSeparator: { ".[".contains($0) }).first.map(String.init) }
+            let file = binding.flatMap { origin[$0] }?.path ?? directory.path
+            return .invalid(file: file, message: describe(error))
         }
     }
 

@@ -42,7 +42,52 @@ enum ConfigurationTests {
         guard case .invalid(_, let message) = store.state() else {
             throw TestFlowAssertionFailure(label: "duplicate", message: "a duplicate account name should be refused")
         }
-        try Expect.contains(message, "more than one file", "Store reloads after a new file")
+        try Expect.contains(message, "also declared in a-home.frame", "Store reloads after a new file and names the other file")
+    }
+
+    /// Files under any names form one configuration; references cross files in any order.
+    static func crossFile() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("mail-cross-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        // Read in name order: access, then accounts, then providers.
+        try """
+            import Mail;
+            let desk: Access = .{ .accounts = [work], .mailboxes = ["INBOX"], .send = false };
+            """.write(to: directory.appendingPathComponent("access.frame"), atomically: true, encoding: .utf8)
+        try """
+            import Mail;
+            let work: Account = .{
+                .provider = host,
+                .username = "levi",
+                .password = .{ .env = "PW" },
+                .identities = [levi],
+            };
+            """.write(to: directory.appendingPathComponent("accounts.frame"), atomically: true, encoding: .utf8)
+        try """
+            import Mail;
+            let host: Provider = .{ .imap = .{ .host = "imap.example.org" }, .smtp = .{ .host = "smtp.example.org" } };
+            let levi: Identity = .{ .address = "levi@example.org", .name = "Levi" };
+            """.write(to: directory.appendingPathComponent("providers.frame"), atomically: true, encoding: .utf8)
+
+        guard case .loaded(let accounts) = MailConfiguration.state(directory: directory, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "cross-file", message: "references across files should resolve: \(MailConfiguration.state(directory: directory, environment: ["PW": "x"]))")
+        }
+        let work = try Expect.notNil(accounts.account(named: "work"), "Account from accounts.frame")
+        try Expect.equal(work.imap?.server.host, "imap.example.org", "Provider from providers.frame")
+        try Expect.equal(work.defaultIdentity.address.name, "Levi", "Identity from providers.frame")
+        try Expect.equal(try accounts.access(named: "desk").accounts, ["work"], "Profile in access.frame names an account binding from accounts.frame")
+
+        try """
+            import Mail;
+            let levi: Identity = .{ .address = "other@example.org" };
+            """.write(to: directory.appendingPathComponent("zz-more.frame"), atomically: true, encoding: .utf8)
+        guard case .invalid(let file, let message) = MailConfiguration.state(directory: directory, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "duplicate", message: "a name declared twice should be refused")
+        }
+        try Expect.true(file.hasSuffix("zz-more.frame"), "Points at the second declaration")
+        try Expect.contains(message, "also declared in providers.frame", "Names the first")
     }
 
     static func smtpVerify() async throws {

@@ -133,6 +133,9 @@ enum MailTestSuite {
         Test("configuration-directory-merges-and-reloads") {
             try ConfigurationTests.directory()
         }
+        Test("configuration-references-across-files") {
+            try ConfigurationTests.crossFile()
+        }
         Test("smtp-verify-logs-in-without-sending") {
             try await ConfigurationTests.smtpVerify()
         }
