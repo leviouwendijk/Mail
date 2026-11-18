@@ -35,9 +35,44 @@ public enum MailFrame {
         case allowed
     }
 
+    /// A value written in the file, or read from an environment variable when
+    /// the file loads: `"smtp.example.org"` or `.{ .env = "SMTP_HOST" }`.
+    public enum Setting<Value: Sendable & Hashable & Decodable & LosslessStringConvertible>: Sendable, Hashable, Decodable {
+        case value(Value)
+        case env(String)
+
+        private enum CodingKeys: String, CodingKey {
+            case env
+        }
+
+        public init(
+            from decoder: any Decoder
+        ) throws {
+            if let value = try? decoder.singleValueContainer().decode(Value.self) {
+                self = .value(value)
+                return
+            }
+            self = .env(try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .env))
+        }
+
+        /// The value, reading the variable from `environment`; `nil` when it is unset or not a `Value`.
+        public func resolve(
+            in environment: [String: String]
+        ) -> Value? {
+            switch self {
+            case .value(let value):
+                return value
+            case .env(let variable):
+                return environment[variable]
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .flatMap { $0.isEmpty ? nil : Value($0) }
+            }
+        }
+    }
+
     public struct Server: Sendable, Hashable, Decodable {
-        public let host: String
-        public let port: Int?
+        public let host: Setting<String>
+        public let port: Setting<Int>?
         public let security: Security?
     }
 
@@ -73,7 +108,7 @@ public enum MailFrame {
 
     public struct Account: Sendable, Hashable, Decodable {
         public let provider: Provider
-        public let username: String
+        public let username: Setting<String>
         public let password: Secret
         public let identities: [Identity]
         public let folders: Folders?
@@ -85,8 +120,8 @@ public enum MailFrame {
 extension MailFrame.Server: FrameDescribable {
     public static var frameSchema: Frame.Schema {
         .object([
-            .init("host", .string, required: true, summary: "The server's host name."),
-            .init("port", .integer, summary: "When absent: SMTP 465 (587 with starttls), IMAP 993 (143 with starttls)."),
+            .init("host", .any, required: true, summary: "The server's host name, or .{ .env = \"VARIABLE\" } to read it from the environment."),
+            .init("port", .any, summary: "A number, or .{ .env = \"VARIABLE\" }. When absent: SMTP 465 (587 with starttls), IMAP 993 (143 with starttls)."),
             .init("security", .members(of: MailFrame.Security.self, summaries: [
                 .tls: "TLS from the first byte. The default.",
                 .starttls: "Plain connection upgraded with STARTTLS before login, as iCloud's SMTP requires. Refused if the server does not offer it.",
@@ -150,7 +185,7 @@ extension MailFrame.Account: FrameDescribable {
     public static var frameSchema: Frame.Schema {
         .object([
             .init("provider", .of(MailFrame.Provider.self), required: true),
-            .init("username", .string, required: true, summary: "The login name, often the address."),
+            .init("username", .any, required: true, summary: "The login name, often the address; or .{ .env = \"VARIABLE\" } to keep it out of the file."),
             .init("password", .of(MailFrame.Secret.self), required: true, summary: "An app password, by reference."),
             .init("identities", .array(.of(MailFrame.Identity.self)), required: true, summary: "Addresses this account sends as; the first is the default."),
             .init("folders", .of(MailFrame.Folders.self)),

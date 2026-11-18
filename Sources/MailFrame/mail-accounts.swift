@@ -155,20 +155,23 @@ public struct MailAccounts: Sendable {
             default:
                 throw Failure.invalid(field: "\(field).password", reason: "set exactly one of env or keychain")
             }
-            let authentication = MailAuthentication(username: spec.username, password: reference)
+            guard let username = spec.username.resolve(in: environment).flatMap(Self.nonEmpty) else {
+                throw Failure.invalid(field: "\(field).username", reason: Self.unset(spec.username))
+            }
+            let authentication = MailAuthentication(username: username, password: reference)
 
             guard spec.provider.smtp != nil || spec.provider.imap != nil else {
                 throw Failure.invalid(field: "\(field).provider", reason: "set smtp, imap or both")
             }
             let smtp = try spec.provider.smtp.map { server in
                 SMTPConfiguration(
-                    server: try Self.server(server, defaultPorts: (465, 587), authentication: authentication, at: "\(field).provider.smtp"),
+                    server: try Self.server(server, defaultPorts: (465, 587), authentication: authentication, environment: environment, at: "\(field).provider.smtp"),
                     clientName: Self.clientName(spec.identities.first?.address)
                 )
             }
             let imap = try spec.provider.imap.map { server in
                 IMAPConfiguration(
-                    server: try Self.server(server, defaultPorts: (993, 143), authentication: authentication, at: "\(field).provider.imap")
+                    server: try Self.server(server, defaultPorts: (993, 143), authentication: authentication, environment: environment, at: "\(field).provider.imap")
                 )
             }
 
@@ -181,7 +184,7 @@ public struct MailAccounts: Sendable {
 
             accounts.append(Account(
                 identifier: field,
-                username: spec.username,
+                username: username,
                 smtp: smtp,
                 imap: imap,
                 identities: identities,
@@ -198,10 +201,11 @@ public struct MailAccounts: Sendable {
         _ spec: MailFrame.Server,
         defaultPorts: (tls: UInt16, startTLS: UInt16),
         authentication: MailAuthentication,
+        environment: [String: String],
         at field: String
     ) throws -> MailServerConfiguration {
-        guard let host = nonEmpty(spec.host) else {
-            throw Failure.invalid(field: "\(field).host", reason: "must not be empty")
+        guard let host = spec.host.resolve(in: environment).flatMap(nonEmpty) else {
+            throw Failure.invalid(field: "\(field).host", reason: unset(spec.host))
         }
         let security: MailSecurity
         switch spec.security ?? .tls {
@@ -213,7 +217,10 @@ public struct MailAccounts: Sendable {
             security = .plaintext
         }
         var port = security == .startTLS ? defaultPorts.startTLS : defaultPorts.tls
-        if let value = spec.port {
+        if let setting = spec.port {
+            guard let value = setting.resolve(in: environment) else {
+                throw Failure.invalid(field: "\(field).port", reason: unset(setting))
+            }
             guard let valid = UInt16(exactly: value), valid > 0 else {
                 throw Failure.invalid(field: "\(field).port", reason: "must be between 1 and 65535")
             }
@@ -270,6 +277,18 @@ public struct MailAccounts: Sendable {
         address
             .flatMap { try? EmailAddress($0) }
             .map { String($0.domain) } ?? "localhost"
+    }
+
+    /// Why a setting has no value: an unset variable names itself; a written value was empty.
+    private static func unset<Value>(
+        _ setting: MailFrame.Setting<Value>
+    ) -> String {
+        switch setting {
+        case .env(let variable):
+            return "environment variable \(variable) is unset, empty or not a valid \(Value.self)"
+        case .value:
+            return "must not be empty"
+        }
     }
 
     private static func nonEmpty(

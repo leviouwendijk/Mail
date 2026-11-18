@@ -6,13 +6,22 @@ import Milieu
 import Testing
 
 enum FrameTests {
+    /// What the example's `.{ .env = … }` settings read.
+    static let environment = [
+        "MAIL_WORK_PASSWORD": "app-password",
+        "AWS_SES_HOST": "email-smtp.eu-north-1.amazonaws.com",
+        "AWS_SES_PORT": "465",
+        "AWS_SMTP_USER": "AKIAEXAMPLE",
+        "AWS_SMTP_PASSWD": "ses-secret",
+    ]
+
     static func example() async throws {
         let accounts = try MailAccounts(
             source: MailFrame.example,
-            environment: ["MAIL_WORK_PASSWORD": "app-password"]
+            environment: environment
         )
 
-        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal"], "Accounts in order")
+        try Expect.equal(accounts.accounts.map(\.identifier), ["work", "personal", "transactional"], "Accounts in order")
         let work = try Expect.notNil(accounts.defaultAccount, "Default account")
         try Expect.equal(work.identifier, "work", "First is default")
         try Expect.equal(work.identities.map(\.address.address.raw), ["alex@practice.example", "info@practice.example"], "Identities")
@@ -32,7 +41,7 @@ enum FrameTests {
     }
 
     static func signature() throws {
-        let accounts = try MailAccounts(source: MailFrame.example, environment: [:])
+        let accounts = try MailAccounts(source: MailFrame.example, environment: environment)
         let identity = try Expect.notNil(accounts.defaultAccount?.defaultIdentity, "Identity")
         let message = identity.message(
             to: [try NamedAddress("jan@example.org")],
@@ -40,6 +49,32 @@ enum FrameTests {
             body: .text("Tot morgen.")
         )
         try Expect.equal(message.body, .text("Tot morgen.\n\n-- \nAlex Example\nPractice Example"), "Signed text")
+    }
+
+    static func environmentSettings() async throws {
+        let accounts = try MailAccounts(source: MailFrame.example, environment: environment)
+        let ses = try Expect.notNil(accounts.account(named: "transactional"), "SES account")
+        try Expect.isNil(ses.imap, "Send-only")
+        try Expect.equal(ses.smtp?.server.host, "email-smtp.eu-north-1.amazonaws.com", "Host from env")
+        try Expect.equal(ses.smtp?.server.port, 465, "Port from env")
+        try Expect.equal(ses.username, "AKIAEXAMPLE", "Username from env")
+        let password = try await accounts.credentials.resolve(ses.smtp!.server.authentication!.password).utf8()
+        try Expect.equal(password, "ses-secret", "Password from env at connect time")
+
+        var unset = environment
+        unset["AWS_SES_HOST"] = nil
+        do {
+            _ = try MailAccounts(source: MailFrame.example, environment: unset)
+            throw TestFlowAssertionFailure(label: "unset", message: "an unset host variable should be refused")
+        } catch let failure as MailAccounts.Failure {
+            try Expect.contains(failure.localizedDescription, "AWS_SES_HOST is unset", "Names the variable")
+        }
+
+        var badPort = environment
+        badPort["AWS_SES_PORT"] = "smtp"
+        try Expect.throwsError("Port variable must be a number") {
+            _ = try MailAccounts(source: MailFrame.example, environment: badPort)
+        }
     }
 
     static func invalid() throws {

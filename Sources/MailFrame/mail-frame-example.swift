@@ -17,6 +17,15 @@ public extension MailFrame {
             .imap = .{ .host = "imap.mail.me.com" },
         };
 
+        // A send-only provider read from the environment, such as Amazon SES:
+        // host, port and username may be `.{ .env = "…" }` like the password.
+        let ses: Provider = .{
+            .smtp = .{
+                .host = .{ .env = "AWS_SES_HOST" },
+                .port = .{ .env = "AWS_SES_PORT" },
+            },
+        };
+
         let practice: Identity = .{
             .address = "alex@practice.example",
             .name = "Alex Example",
@@ -43,6 +52,16 @@ public extension MailFrame {
             .username = "alex@icloud.com",
             .password = .{ .keychain = "personal" },
             .identities = [.{ .address = "alex@icloud.com", .name = "Alex" }],
+        };
+
+        // SES sends only as verified identities; it has no IMAP, so no Sent copy.
+        let transactional: Account = .{
+            .provider = ses,
+            .username = .{ .env = "AWS_SMTP_USER" },
+            .password = .{ .env = "AWS_SMTP_PASSWD" },
+            .identities = [.{ .address = "noreply@practice.example", .name = "Practice Example" }],
+            .sending = .allowed,
+            .about = "Transactional mail through Amazon SES.",
         };
         """#
 }

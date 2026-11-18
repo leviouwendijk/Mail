@@ -79,7 +79,7 @@ enum StartTLSTests {
     }
 
     static func frameDefaults() throws {
-        let accounts = try MailAccounts(source: MailFrame.example, environment: [:])
+        let accounts = try MailAccounts(source: MailFrame.example, environment: FrameTests.environment)
         let personal = try Expect.notNil(accounts.account(named: "personal"), "iCloud account")
         try Expect.equal(personal.smtp?.server.security, .startTLS, "STARTTLS")
         try Expect.equal(personal.smtp?.server.port, 587, "Submission port")

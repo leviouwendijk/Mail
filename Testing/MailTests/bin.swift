@@ -94,6 +94,9 @@ enum MailTestSuite {
         Test("frame-identity-signature") {
             try FrameTests.signature()
         }
+        Test("frame-settings-from-environment") {
+            try await FrameTests.environmentSettings()
+        }
         Test("frame-rejects-invalid") {
             try FrameTests.invalid()
         }
