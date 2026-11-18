@@ -1,13 +1,15 @@
 import Foundation
 import Frame
 import IO
+import Path
 import Readers
 
 /// Where mail configuration lives by default: every `*.frame` file in
-/// `$XDG_CONFIG_HOME/mail`, or `~/.config/mail`, under any names. Each file
+/// `$XDG_CONFIG_HOME/mail`, or `~/.config/mail`, and its subdirectories,
+/// under any names. Each file
 /// starts with `import Mail;`; together they form one configuration, so a
 /// binding may reference one declared in another file, in any order. Names
-/// must be unique across files; accounts keep file-name order, so the
+/// must be unique across files; accounts keep relative-path order, so the
 /// default account is the first in the first file that declares one.
 public enum MailConfiguration {
     public enum State: Sendable {
@@ -26,15 +28,18 @@ public enum MailConfiguration {
         return base.appendingPathComponent("mail", isDirectory: true)
     }
 
-    /// The `.frame` files in `directory`, in name order.
+    /// The `.frame` files in `directory` and its subdirectories, by relative
+    /// path; hidden files are skipped and symbolic links are not followed.
     public static func files(
         in directory: URL
     ) throws -> [URL] {
         guard FileSystem.default.exists(directory) else {
             return []
         }
-        return try DirectoryInspector(directory).entries()
-            .filter { $0.url.pathExtension == "frame" && $0.kind != .directory }
+        return try PathWalker(root: directory, configuration: .init(emitDirectories: false))
+            .walk()
+            .filter { $0.url.pathExtension == "frame" }
+            .sorted { $0.url.path < $1.url.path }
             .map(\.url)
     }
 

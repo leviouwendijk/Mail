@@ -27,8 +27,10 @@ enum PathCommand: RunnableArgumentCommand {
     ) async throws {
         let directory = MailConfiguration.directory()
         print(directory.path)
+        let root = directory.standardizedFileURL.path + "/"
         for file in try MailConfiguration.files(in: directory) {
-            print("  \(file.lastPathComponent)")
+            let path = file.standardizedFileURL.path
+            print("  " + (path.hasPrefix(root) ? String(path.dropFirst(root.count)) : path))
         }
     }
 }

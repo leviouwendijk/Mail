@@ -79,6 +79,28 @@ enum ConfigurationTests {
         try Expect.equal(work.defaultIdentity.address.name, "Levi", "Identity from providers.frame")
         try Expect.equal(try accounts.access(named: "desk").accounts, ["work"], "Profile in access.frame names an account binding from accounts.frame")
 
+        // Subdirectories are read too, and reference the top level; hidden files are not.
+        let practice = directory.appendingPathComponent("hondenmeesters", isDirectory: true)
+        try FileManager.default.createDirectory(at: practice, withIntermediateDirectories: true)
+        try """
+            import Mail;
+            let practiceDesk: Access = .{ .accounts = [practiceMail], .mailboxes = ["INBOX/Klanten/*"] };
+            let practiceMail: Account = .{
+                .provider = host,
+                .username = "praktijk",
+                .password = .{ .env = "PW" },
+                .identities = [.{ .address = "info@hondenmeesters.nl" }],
+            };
+            """.write(to: practice.appendingPathComponent("access.frame"), atomically: true, encoding: .utf8)
+        try "import Mail;\nlet broken: Account = 42;".write(to: practice.appendingPathComponent(".hidden.frame"), atomically: true, encoding: .utf8)
+
+        guard case .loaded(let nested) = MailConfiguration.state(directory: directory, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "nested", message: "subdirectory files should load: \(MailConfiguration.state(directory: directory, environment: ["PW": "x"]))")
+        }
+        try Expect.equal(nested.accounts.map(\.identifier), ["work", "practiceMail"], "Top level first, then the subdirectory")
+        try Expect.equal(nested.account(named: "practiceMail")?.imap?.server.host, "imap.example.org", "Nested file uses a top-level provider")
+        try Expect.equal(try nested.access(named: "practiceDesk").accounts, ["practiceMail"], "Nested profile")
+
         try """
             import Mail;
             let levi: Identity = .{ .address = "other@example.org" };

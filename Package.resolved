@@ -1,5 +1,5 @@
 {
-  "originHash" : "5a70821a029de8acb138924fed3e070ed95dec5af3308bd2eb7cee7f98f2543e",
+  "originHash" : "e046f271c80c50c296ecc8c9e4fffab281736de2cadd0ef0b64a3a4eb03084dc",
   "pins" : [
     {
       "identity" : "arguments",
@@ -17,6 +17,24 @@
       "state" : {
         "branch" : "master",
         "revision" : "5ffdb160c4913e02214020eb75ac620900cf2914"
+      }
+    },
+    {
+      "identity" : "difference",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Difference.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "615158c50130785c3e5934d6210ecf447134ca3b"
+      }
+    },
+    {
+      "identity" : "excerpt",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Excerpt.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "9369604e8cfe761588003c61ed849462ca8fb14e"
       }
     },
     {
@@ -65,6 +83,15 @@
       }
     },
     {
+      "identity" : "methods",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Methods.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "0c1800e32bf5b0c4f2a19b2a28484b18a7edc7de"
+      }
+    },
+    {
       "identity" : "milieu",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/Milieu.git",
@@ -83,6 +110,15 @@
       }
     },
     {
+      "identity" : "path",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Path.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "3ad6bcbfc000566cb37deff48d97adc93d2c94b3"
+      }
+    },
+    {
       "identity" : "position",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/leviouwendijk/Position.git",
@@ -98,6 +134,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "776500d2ee4eb47ca536bd307ce1bb9d48878423"
+      }
+    },
+    {
+      "identity" : "protocolcomponents",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/ProtocolComponents.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "866ef7b22350aac41f455c5b2188f95f411a4507"
       }
     },
     {
