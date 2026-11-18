@@ -210,6 +210,33 @@ public actor IMAPSession {
         try await raw(uid).map(ReceivedMessage.init(parsing:))
     }
 
+    /// The first mailbox advertising `role` (SPECIAL-USE).
+    public func mailbox(
+        for role: IMAPSpecialUse
+    ) async throws -> IMAPMailbox? {
+        try await list().first { $0.specialUse == role }
+    }
+
+    /// Stores `message` in `mailbox`, as for a draft or a sent copy. Returns the
+    /// new UID when the server reports it (UIDPLUS `APPENDUID`).
+    @discardableResult
+    public func append(
+        _ message: Data,
+        to mailbox: String,
+        flags: Set<IMAPFlag> = []
+    ) async throws -> IMAPUID? {
+        let flagList = "(" + flags.map(\.rawValue).sorted().joined(separator: " ") + ")"
+        let (_, _, tagged) = try await run(
+            [.text("APPEND"), .mailbox(mailbox), .text(flagList), .literal(message)],
+            name: "APPEND"
+        )
+        let code = tagged.code?.split(separator: " ") ?? []
+        guard code.count == 3, code[0].uppercased() == "APPENDUID", let uid = UInt32(code[2]) else {
+            return nil
+        }
+        return IMAPUID(uid)
+    }
+
     public func logout() async throws {
         _ = try? await run([.text("LOGOUT")], name: "LOGOUT")
     }

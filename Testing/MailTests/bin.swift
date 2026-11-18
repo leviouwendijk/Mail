@@ -79,6 +79,12 @@ enum MailTestSuite {
         Test("imap-synchronizing-literal") {
             try await IMAPTests.synchronizingLiteral()
         }
+        Test("imap-append-draft") {
+            try await IMAPWriteTests.append()
+        }
+        Test("readable-text-from-html") {
+            try IMAPWriteTests.readableText()
+        }
         Test("imap-command-failure") {
             try await IMAPTests.failure()
         }

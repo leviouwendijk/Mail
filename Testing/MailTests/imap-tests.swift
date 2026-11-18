@@ -189,3 +189,42 @@ enum IMAPTests {
         }
     }
 }
+
+enum IMAPWriteTests {
+    static func append() async throws {
+        let transport = ScriptedTransport([
+            "* OK ready",
+            "* CAPABILITY IMAP4rev1 UIDPLUS",
+            "A1 OK done",
+            "+ Ready for literal data",
+            "A2 OK [APPENDUID 99 1207] APPEND completed",
+        ])
+        let session = IMAPSession(transport: transport)
+        try await session.start()
+
+        let message = Data("Subject: Concept\r\n\r\nHoi\r\n".utf8)
+        let uid = try await session.append(message, to: "Concepten", flags: [.draft, .seen])
+        try Expect.equal(uid, IMAPUID(1207), "APPENDUID")
+        try Expect.equal(
+            await transport.written,
+            [
+                "A1 CAPABILITY\r\n",
+                "A2 APPEND \"Concepten\" (\\Draft \\Seen) {\(message.count)}\r\n",
+                String(decoding: message, as: UTF8.self) + "\r\n",
+            ],
+            "Literal after continuation"
+        )
+    }
+
+    static func readableText() throws {
+        let raw = Data((
+            "Content-Type: text/html; charset=utf-8\r\n\r\n" +
+            "<html><head><style>p{}</style></head><body><p>Hallo&nbsp;Jan,</p><ul><li>één</li><li>twee</li></ul><script>x()</script>Groet</body></html>"
+        ).utf8)
+        try Expect.equal(
+            ReceivedMessage(parsing: raw).readableText,
+            "Hallo Jan,\n• één\n• twee\nGroet",
+            "HTML reduced to text"
+        )
+    }
+}
