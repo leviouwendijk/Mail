@@ -100,6 +100,9 @@ enum ConfigurationTests {
         try Expect.equal(nested.accounts.map(\.identifier), ["work", "practiceMail"], "Top level first, then the subdirectory")
         try Expect.equal(nested.account(named: "practiceMail")?.imap?.server.host, "imap.example.org", "Nested file uses a top-level provider")
         try Expect.equal(try nested.access(named: "practiceDesk").accounts, ["practiceMail"], "Nested profile")
+        try Expect.equal(nested.account(named: "practiceMail")?.group, "hondenmeesters", "Group from the folder")
+        try Expect.isNil(nested.account(named: "work")?.group, "Top-level files have no group")
+        try Expect.equal(try MailSelector(parsing: "hondenmeesters").accounts(in: nested).map(\.identifier), ["practiceMail"], "Selector by group")
 
         try """
             import Mail;

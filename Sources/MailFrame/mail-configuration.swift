@@ -99,9 +99,19 @@ public enum MailConfiguration {
         }
 
         do {
+            // A file in a subfolder puts its accounts in that folder's group.
+            let root = directory.standardizedFileURL.pathComponents
+            let groups = origin.compactMapValues { file -> String? in
+                let components = file.standardizedFileURL.pathComponents
+                guard components.count > root.count + 1, Array(components.prefix(root.count)) == root else {
+                    return nil
+                }
+                return components[root.count]
+            }
             let accounts = try MailAccounts(
                 document: Frame.Document(imports: imports, bindings: bindings),
-                environment: environment
+                environment: environment,
+                groups: groups
             )
             try accounts.validateProfiles()
             return .loaded(accounts)

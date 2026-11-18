@@ -136,12 +136,16 @@ enum SearchCommand: BoundArgumentCommand {
         invocation: ParsedInvocation
     ) async throws {
         let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
-        let account = try EmailCLI.account(options.account, in: accounts, access: access)
-        try access.check(mailbox: options.mailbox)
         let query = try options.query()
         if query.usesGmailExtensions {
             try access.checkCrossLabelSearch()
         }
+        if !options.targets.isEmpty {
+            try await searchAcross(options, query: query, accounts: accounts, access: access)
+            return
+        }
+        let account = try EmailCLI.account(options.account, in: accounts, access: access)
+        try access.check(mailbox: options.mailbox)
 
         let (total, summaries) = try await EmailCLI.imap(account, in: accounts).session { session in
             try await session.select(options.mailbox)
@@ -161,11 +165,34 @@ enum SearchCommand: BoundArgumentCommand {
         }
         FileHandle.standardError.write(Data("\(summaries.count) of \(total) in \(options.mailbox)\n".utf8))
     }
+
+    /// `--in` selectors: every mailbox they pick, across accounts, newest first.
+    static func searchAcross(
+        _ options: SearchOptions,
+        query: IMAPSearch,
+        accounts: MailAccounts,
+        access: MailAccess
+    ) async throws {
+        let selectors = try options.targets.map(MailSelector.init(parsing:))
+        let result = try await accounts.search(query, in: selectors, limit: max(options.limit, 1)) { account, mailbox, _ in
+            try access.check(account: account.identifier)
+            try access.check(mailbox: mailbox)
+        }
+        for hit in result.hits {
+            let marker = hit.summary.isUnread ? "●" : " "
+            let from = hit.summary.envelope?.from.first.map(EmailCLI.display) ?? ""
+            print("\(marker) \(hit.account):\(hit.mailbox) \(hit.summary.uid.rawValue)  \(EmailCLI.shortDate(hit.date))  \(from)\n            \(hit.summary.envelope?.subject ?? "(no subject)")")
+        }
+        FileHandle.standardError.write(Data("\(result.hits.count) of \(result.total) in \(result.searched.joined(separator: ", "))\n".utf8))
+    }
 }
 
 struct SearchOptions: Sendable, ArgumentGroup {
     @Opt("account", short: "a", help: "Account name; the default account when absent.")
     var account: String?
+
+    @Opts("in", help: "Selector, repeatable: account, group or *, with :mailbox, :prefix/* or :@role (hondenmeesters:@junk). Replaces --account and --mailbox.")
+    var targets: [String]
 
     @Opt("mailbox", short: "m", default: "INBOX", help: "Mailbox, such as INBOX/Clients.")
     var mailbox: String

@@ -135,16 +135,25 @@ public struct MailAccess: Sendable, Equatable {
         guard let mailboxes else {
             return true
         }
-        let candidate = Self.normalized(name)
-        return mailboxes.contains { pattern in
-            let pattern = Self.normalized(pattern)
-            if pattern.hasSuffix("*") {
-                let prefix = String(pattern.dropLast())
-                let parent = prefix.hasSuffix("/") || prefix.hasSuffix(".") ? String(prefix.dropLast()) : prefix
-                return candidate.hasPrefix(prefix) || candidate == parent
-            }
-            return candidate == pattern
+        return mailboxes.contains { Self.matches(pattern: $0, mailbox: name) }
+    }
+
+    /// `INBOX` matches case-insensitively; `prefix/*` matches the prefix and everything below it.
+    public static func matches(
+        pattern: String,
+        mailbox: String
+    ) -> Bool {
+        let candidate = normalized(mailbox)
+        let pattern = normalized(pattern)
+        if pattern == "*" {
+            return true
         }
+        if pattern.hasSuffix("*") {
+            let prefix = String(pattern.dropLast())
+            let parent = prefix.hasSuffix("/") || prefix.hasSuffix(".") ? String(prefix.dropLast()) : prefix
+            return candidate.hasPrefix(prefix) || candidate == parent
+        }
+        return candidate == pattern
     }
 
     public func allows(

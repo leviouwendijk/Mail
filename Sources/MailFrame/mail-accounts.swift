@@ -33,6 +33,8 @@ public struct MailAccounts: Sendable {
         public let sending: MailFrame.Sending
         /// The provider files sent mail itself; skip saving a copy after sending.
         public let savesSentMail: Bool
+        /// Its group, for selectors such as `hondenmeesters:@junk`.
+        public let group: String?
         public let about: String?
 
         public var defaultIdentity: MailIdentity {
@@ -59,6 +61,12 @@ public struct MailAccounts: Sendable {
         self.routes = routes
         self.sources = sources
         self.credentials = RoutedCredentialProvider(routes: routes)
+    }
+
+    /// Group names in first-seen order.
+    public var groups: [String] {
+        var seen: Set<String> = []
+        return accounts.compactMap(\.group).filter { seen.insert($0).inserted }
     }
 
     /// The profile named `name`; `nil` means unrestricted.
@@ -180,10 +188,12 @@ public struct MailAccounts: Sendable {
         )
     }
 
+    /// `groups` names each binding's default group, such as the folder its file is in.
     public init(
         document: Frame.Document,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        keychainService: String = "mail"
+        keychainService: String = "mail",
+        groups: [String: String] = [:]
     ) throws {
         var accounts: [Account] = []
         var routes: [CredentialReference: any CredentialProvider] = [:]
@@ -256,6 +266,7 @@ public struct MailAccounts: Sendable {
                 folders: Self.folders(spec.folders),
                 sending: spec.sending ?? .drafts,
                 savesSentMail: spec.provider.features?.savesSentMail ?? false,
+                group: spec.group.flatMap(Self.nonEmpty) ?? groups[field],
                 about: spec.about.flatMap(Self.nonEmpty)
             ))
         }

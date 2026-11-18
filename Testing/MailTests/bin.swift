@@ -109,6 +109,12 @@ enum MailTestSuite {
         Test("frame-split-server-logins") {
             try await FrameTests.splitServers()
         }
+        Test("selector-parsing") {
+            try SelectorTests.parsing()
+        }
+        Test("selector-matching-roles-and-groups") {
+            try SelectorTests.matching()
+        }
         Test("access-profile-matching") {
             try AccessTests.matching()
         }
