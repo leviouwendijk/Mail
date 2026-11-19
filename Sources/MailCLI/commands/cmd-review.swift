@@ -41,12 +41,7 @@ enum ReviewCommand: BoundArgumentCommand {
             return
         }
 
-        let own = Set(
-            accounts.accounts
-                .flatMap(\.identities)
-                .map { String($0.address.address.domain).lowercased() }
-                .filter { !MailSuspicionPolicy.freemailDomains.contains($0) }
-        )
+        let own = EmailCLI.ownDomains(accounts)
         let policy = MailSuspicionPolicy(
             trustedDomains: Set(options.trusted),
             ownDomains: own,

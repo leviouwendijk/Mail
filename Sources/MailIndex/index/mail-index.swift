@@ -104,6 +104,30 @@ public actor MailIndex {
         last_sent REAL
     );
     CREATE INDEX IF NOT EXISTS correspondents_domain ON correspondents (domain);
+    -- Plans of server changes and what applying them did. Durable, like decisions.
+    CREATE TABLE IF NOT EXISTS plans (
+        id TEXT PRIMARY KEY,
+        created_at REAL NOT NULL,
+        summary TEXT NOT NULL,
+        body TEXT NOT NULL,
+        applied_at REAL,
+        undone_at REAL
+    );
+    CREATE TABLE IF NOT EXISTS journal (
+        plan_id TEXT NOT NULL,
+        step INTEGER NOT NULL,
+        at REAL NOT NULL,
+        action TEXT NOT NULL,
+        mailbox TEXT NOT NULL,
+        uid_validity INTEGER NOT NULL,
+        uid INTEGER NOT NULL,
+        message_id TEXT,
+        destination TEXT,
+        destination_validity INTEGER,
+        destination_uid INTEGER,
+        outcome TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS journal_plan ON journal (plan_id);
     -- Review decisions. Durable: syncing and reindexing never touch them.
     CREATE TABLE IF NOT EXISTS decisions (
         scope TEXT NOT NULL,

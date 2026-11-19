@@ -130,6 +130,12 @@ enum MailTestSuite {
         Test("review-freemail-invoice-campaign") {
             try await ReviewTests.freemailCampaign()
         }
+        Test("plan-apply-verifies-journals-undoes") {
+            try await PlanTests.applyAndUndo()
+        }
+        Test("plan-refuses-renumbered-mailbox") {
+            try await PlanTests.renumbered()
+        }
         Test("review-domain-lookalikes") {
             try ReviewTests.domains()
         }
