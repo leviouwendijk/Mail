@@ -61,6 +61,10 @@ is that an agent sees metadata by default and content only by grant:
   reviewed, and grants last until the session ends.
 - **Read only what is granted.** `mail_mailboxes`, `mail_search` and
   `mail_read` refuse anything outside the grants, before connecting.
+- **Attachments as files.** `mail_save_attachment` needs the same read grant
+  and writes to `mail/<account>/<mailbox>-<uid>/` under the exports directory
+  of Agentic's `settings.frame` (`exports.directory`; by default
+  `.agentic/artifacts/exports` in the workspace). It never overwrites.
 - **Writing.** `mail_draft` needs a `draft` grant. `mail_send` also follows
   the account's `sending` policy:
   - `drafts`: refused;
