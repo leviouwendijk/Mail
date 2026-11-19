@@ -178,6 +178,9 @@ enum MailTestSuite {
         Test("configuration-directory-merges-and-reloads") {
             try ConfigurationTests.directory()
         }
+        Test("configuration-private-and-shared-roots") {
+            try ConfigurationTests.roots()
+        }
         Test("configuration-references-across-files") {
             try ConfigurationTests.crossFile()
         }

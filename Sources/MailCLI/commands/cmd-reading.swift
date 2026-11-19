@@ -62,7 +62,7 @@ struct ProbeOptions: Sendable, ArgumentGroup {
     @Flag("all", help: "Probe every account.")
     var all: Bool
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")
@@ -114,7 +114,7 @@ struct MailboxesOptions: Sendable, ArgumentGroup {
     @Flag("counts", short: "c", help: "Also show total and unread counts.")
     var counts: Bool
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")
@@ -243,7 +243,7 @@ struct SearchOptions: Sendable, ArgumentGroup {
     @Opt("limit", short: "n", default: 20, help: "Most recent matches to show.")
     var limit: Int
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")
@@ -347,7 +347,7 @@ struct ReadOptions: Sendable, ArgumentGroup {
     @Flag("raw", help: "Print the message source as received.")
     var raw: Bool
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")

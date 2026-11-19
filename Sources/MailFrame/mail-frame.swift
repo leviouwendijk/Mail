@@ -126,7 +126,7 @@ public enum MailFrame {
         public let identities: [Identity]
         public let folders: Folders?
         public let sending: Sending?
-        /// The account's group; its folder under ~/.config/mail when absent.
+        /// The account's group; when absent, its folder under a root's .config/mail, or a shared root's name for that root's top-level files.
         public let group: String?
         public let about: String?
     }
@@ -220,7 +220,7 @@ extension MailFrame.Account: FrameDescribable {
                 .confirm: "An agent may send after the owner confirms each message.",
                 .allowed: "An agent may send without asking.",
             ]), summary: "What an agent may do with outgoing mail."),
-            .init("group", .string, summary: "A group to select accounts together, as in hondenmeesters:@junk; the account's folder under ~/.config/mail when absent."),
+            .init("group", .string, summary: "A group to select accounts together, as in hondenmeesters:@junk; the account's folder under a root's .config/mail (or a shared root's name) when absent."),
             .init("about", .string, summary: "What this account is for, in your own words."),
         ], summary: "A mailbox account, identified by the binding name. The first declared is the default.")
     }

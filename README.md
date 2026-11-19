@@ -13,7 +13,7 @@ third-party mail stack; the wire grammars use Parsing.
 | `SMTP` | `SMTPClient`: submit over implicit TLS (465) or STARTTLS (587), `verify` to test a login. |
 | `IMAP` | `IMAPClient` / `IMAPSession`: list, status, search with a typed query DSL (`IMAPSearch`), fetch summaries (optionally with chosen header fields and the `BODYSTRUCTURE` attachment tree, in batches) and messages, append. Fetching never marks mail read; selections are read-only unless selected writable, which enables `store` (flags), `copy`/`move` (with the UIDPLUS `COPYUID` mapping; `MOVE`, else copy + `UID EXPUNGE` of only those UIDs), `expunge` and `create`. Gmail extensions (search syntax, threads, labels, label changes) when the server offers them. |
 | `MailIndex` | `MailIndex`: a local SQLite index per account (over the `SQLite` package) (`~/.local/share/mail/index/<account>.sqlite`) of envelopes, flags, list and authentication headers and attachments, never bodies. Incremental `sync` (UIDNEXT, flag refresh, removals, UIDVALIDITY rebuilds), correspondents from Sent, `clutter` by sender/domain/list, `select` of UIDs per mailbox for later moves. Review: `suspicious(policy)` scores received mail (payment wording from unknown vendors, strangers, rare senders, DMARC/SPF/DKIM failures, Reply-To elsewhere, lookalike domains, risky attachments) with a reason per point; durable `decisions` (trust/block a sender or domain, record/dismiss a message) survive reindexing. |
-| `MailFrame` | The `Mail` Frame module and loader: accounts, providers, identities and access profiles from `~/.config/mail/**/*.frame`. |
+| `MailFrame` | The `Mail` Frame module and loader: accounts, providers, identities and access profiles from `.config/mail/**/*.frame` in every root: your own `~/.config/mail`, then the shared roots in `~/.config/roots.frame` (Frame's `Roots`), such as the team's synced folder. |
 | `email` | The command line, over the same configuration. |
 
 ## The `email` command
@@ -21,7 +21,7 @@ third-party mail stack; the wire grammars use Parsing.
 ```sh
 email example > ~/.config/mail/accounts.frame   # a complete, valid starting point
 email module                                    # install the Frame module for editor checking
-email path                                      # the directory and the files read from it
+email path                                      # the roots, each root's directory and the files read from it
 email check                                     # validate; does every password resolve? (connects to nothing)
 email probe --all                               # log in to every server; sends nothing
 email accounts
@@ -44,7 +44,7 @@ email send  -a work --to client@example.org -s 'Offerte' --html-file offerte.htm
                                                 # HTML alone gets a derived text version
 ```
 
-Every command takes `--config <dir>` (instead of `~/.config/mail`) and
+Every command reads every root's `.config/mail`, or takes `--config <dir>` to read one directory alone, and
 `--access <profile>` (limit to a named access profile). `send` shows the
 message and asks before sending unless `--yes`; it saves a copy in Sent
 unless the provider does that itself.

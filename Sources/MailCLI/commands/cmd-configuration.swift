@@ -4,9 +4,11 @@ import Frame
 import Mail
 import MailConnection
 import MailFrame
+import Roots
+import IO
 
 struct ConfigurationOptions: Sendable, ArgumentGroup {
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")
@@ -19,18 +21,28 @@ enum PathCommand: RunnableArgumentCommand {
     static let name = "path"
 
     static func components() throws -> [CommandComponentLowerable] {
-        [about("Print the configuration directory and the files read from it.")]
+        [about("Print the roots (~/.config/roots.frame), each root's mail directory and the files read from it.")]
     }
 
     static func run(
         _ invocation: ParsedInvocation
     ) async throws {
-        let directory = MailConfiguration.directory()
-        print(directory.path)
-        let root = directory.standardizedFileURL.path + "/"
-        for file in try MailConfiguration.files(in: directory) {
-            let path = file.standardizedFileURL.path
-            print("  " + (path.hasPrefix(root) ? String(path.dropFirst(root.count)) : path))
+        let roots = Roots.load()
+        print("roots  \(roots.file.path)\(FileSystem.default.exists(roots.file) ? "" : " (none: only your own)")")
+        for problem in roots.problems {
+            print("  ! \(problem)")
+        }
+        for source in MailConfiguration.sources(roots: roots) {
+            let exists = FileSystem.default.exists(source.directory)
+            print("\(source.root)  \(source.directory.path)\(exists ? "" : " (missing)")")
+            for issue in RootFileIssues.scan(source.directory).descriptions {
+                print("  ! \(issue)")
+            }
+            let prefix = source.directory.standardizedFileURL.path + "/"
+            for file in try MailConfiguration.files(in: source.directory) {
+                let path = file.standardizedFileURL.path
+                print("  " + (path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path))
+            }
         }
     }
 }

@@ -4,6 +4,9 @@ import MailConnection
 import MailFrame
 import SMTP
 import Testing
+import Writers
+import IO
+import Roots
 
 enum ConfigurationTests {
     static func directory() throws {
@@ -113,6 +116,58 @@ enum ConfigurationTests {
         }
         try Expect.true(file.hasSuffix("zz-more.frame"), "Points at the second declaration")
         try Expect.contains(message, "also declared in providers.frame", "Names the first")
+    }
+
+    /// Your own directory plus a shared root: groups, references across roots,
+    /// duplicates named with their root, and files iCloud has not downloaded.
+    static func roots() throws {
+        let base = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("mail-roots-\(UUID().uuidString)", isDirectory: true)
+        let own = base.appendingPathComponent("home/.config/mail", isDirectory: true)
+        let team = base.appendingPathComponent("team/.config/mail", isDirectory: true)
+        func write(_ text: String, _ url: URL) throws {
+            try FileWriter(url).write(text, options: .overwriteWithoutBackup)
+        }
+        try write("""
+            import Mail;
+            let mine: Account = .{ .provider = shop, .username = "me", .password = .{ .env = "PW" }, .identities = [.{ .address = "me@example.org" }] };
+            """, own.appendingPathComponent("shop/accounts.frame"))
+        try write("""
+            import Mail;
+            let shop: Provider = .{ .imap = .{ .host = "imap.example.org" } };
+            let contact: Account = .{ .provider = shop, .username = "contact", .password = .{ .env = "PW" }, .identities = [.{ .address = "contact@example.org" }] };
+            """, team.appendingPathComponent("providers.frame"))
+        try write("""
+            import Mail;
+            let desk: Account = .{ .provider = shop, .username = "desk", .password = .{ .env = "PW" }, .identities = [.{ .address = "desk@example.org" }] };
+            """, team.appendingPathComponent("shop/accounts.frame"))
+
+        let sources = [
+            MailConfiguration.Source(root: Root.privateName, directory: own),
+            MailConfiguration.Source(root: "team", directory: team, group: "team"),
+        ]
+        guard case .loaded(let accounts) = MailConfiguration.state(sources: sources, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "roots", message: "\(MailConfiguration.state(sources: sources, environment: ["PW": "x"]))")
+        }
+        try Expect.equal(accounts.accounts.map(\.identifier), ["mine", "contact", "desk"], "Your own first, then the shared root")
+        try Expect.equal(accounts.accounts.map(\.group), ["shop", "team", "shop"], "Subfolder group, else the root's")
+
+        try write("""
+            import Mail;
+            let contact: Account = .{ .provider = shop, .username = "c", .password = .{ .env = "PW" }, .identities = [.{ .address = "c@example.org" }] };
+            """, own.appendingPathComponent("contact.frame"))
+        guard case .invalid(_, let duplicate) = MailConfiguration.state(sources: sources, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "duplicate", message: "a name in two roots should be refused")
+        }
+        try Expect.contains(duplicate, "also declared in contact.frame", "Names the other file")
+        try FileSystem.default.remove(own.appendingPathComponent("contact.frame"))
+
+        try write("", team.appendingPathComponent("shop/.access.frame.icloud"))
+        guard case .invalid(let file, let message) = MailConfiguration.state(sources: sources, environment: ["PW": "x"]) else {
+            throw TestFlowAssertionFailure(label: "icloud", message: "an evicted file should stop loading")
+        }
+        try Expect.true(file.hasSuffix("shop/access.frame"), "Names the missing file")
+        try Expect.contains(message, "not downloaded", "Says why")
     }
 
     static func smtpVerify() async throws {

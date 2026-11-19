@@ -26,7 +26,7 @@ enum EmailCommand: ArgumentCommand {
 
     static func components() throws -> [CommandComponentLowerable] {
         [
-            about("Read, search, draft and send mail over the accounts in ~/.config/mail/*.frame."),
+            about("Read, search, draft and send mail over the accounts in .config/mail/*.frame of every root: your home, then the shared roots in ~/.config/roots.frame."),
         ]
     }
 

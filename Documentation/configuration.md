@@ -6,35 +6,66 @@ configured once.
 
 ## Where the files live
 
-Every `*.frame` file under `$XDG_CONFIG_HOME/mail`, or `~/.config/mail`, at any
-depth and under any name. Hidden files are skipped and symbolic links are not
-followed. `email path` prints the directory and the files it reads.
+Every `*.frame` file under `.config/mail/` of every **root**, at any depth and
+under any name. Hidden files are skipped and symbolic links are not followed.
+
+- **Your own root** is your home directory: `~/.config/mail` (or
+  `$XDG_CONFIG_HOME/mail`). Personal mailboxes and aliases go here.
+- **Shared roots** are declared in `~/.config/roots.frame` (Frame's `Roots`
+  library), such as a team folder in iCloud. Each holds the same tree as your
+  home, so its mail configuration is `<root>/.config/mail/`. Shared mailboxes,
+  providers and team access profiles go there, for everyone at once.
 
 ```
-~/.config/mail/
-├── providers.frame
-├── hondenmeesters/
-│   ├── accounts.frame
-│   └── access.frame
+// ~/.config/roots.frame
+import Roots;
+let hondenmeesters: Root = .{ .path = "~/Library/Mobile Documents/com~apple~CloudDocs/Shared Files/Hondenmeesters", .writable = true };
+```
+
+```
+~/.config/mail/                         your own
+├── providers.frame                     leviouwendijkDomain
+├── hondenmeesters/accounts.frame       levi@ (joins the hondenmeesters group)
 └── leviouwendijk/
     ├── accounts.frame
     └── access.frame
+
+<Hondenmeesters>/.config/mail/          shared root
+├── providers.frame                     racknerd, ses, gmail, hondenmeestersDomain
+└── hondenmeesters/
+    ├── accounts.frame                  support@, contact@, betalingen@, …
+    └── access.frame                    team profiles
 ```
+
+`email path` prints the roots file, each root's directory and the files it
+reads, with any problem: a declared root that is not there, a file iCloud has
+not downloaded yet, or a sync conflict copy. `--config <dir>` reads that one
+directory alone instead.
 
 How the files combine:
 
-- **One configuration.** Each file starts with `import Mail;`. All files
-  together form one configuration: a binding may reference one declared in
-  another file, in any order.
-- **Unique names.** A name declared in two files is an error naming both.
+- **One configuration.** Each file starts with `import Mail;`. All files of all
+  roots together form one configuration: a binding may reference one declared
+  in another file or another root, in any order.
+- **Unique names.** A name declared in two files, in the same root or not, is
+  an error naming both.
 - **Every error at once.** Each file is checked with the others' bindings in
   scope, and every failing file is reported, not just the first.
-- **Default account.** Files are read in relative-path order; the first account
-  in the first file that declares one is the default.
+- **Default account.** Your own root is read first, then each shared root,
+  each in relative-path order; the first account is the default, so it is
+  always one of your own when you have any.
 - **Groups from folders.** An account in a file under a top-level folder
-  belongs to that folder's group (`hondenmeesters`, `leviouwendijk` above),
-  unless it sets `.group` itself. Groups let one selector reach several
+  belongs to that folder's group (`hondenmeesters`, `leviouwendijk` above) in
+  whichever root; an account in a shared root's top-level file belongs to the
+  root's group. `.group` overrides both. Groups let one selector reach several
   accounts; see [Access](access.md).
+- **No secrets in any root.** Passwords are named (`.env`, keychain) and set
+  on each machine; a synced folder never holds one.
+- **Caches stay local.** The index (`~/.local/share/mail/index`) is per
+  machine and never belongs in a root.
+- **Synced folders.** A file iCloud has not downloaded, or a conflict copy
+  (`accounts 2.frame`), stops loading with a message rather than silently
+  dropping or doubling accounts.
 
 Start from a complete, valid example and check as you go:
 

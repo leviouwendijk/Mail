@@ -15,6 +15,6 @@ compile {
 tests {
     primary = "t_mail"
 }
-details = "MIME, SMTP and IMAP with STARTTLS, a search DSL, Frame-configured accounts in ~/.config/mail, and the email command line."
+details = "MIME, SMTP and IMAP with STARTTLS, a search DSL, Frame-configured accounts in every root's .config/mail (own and shared), and the email command line."
 author = "leviouwendijk"
 update = "https://raw.githubusercontent.com/leviouwendijk/Mail/master/build-object.pkl"

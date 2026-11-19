@@ -42,7 +42,7 @@ struct ComposeOptions: Sendable, ArgumentGroup {
     @Flag("yes", short: "y", help: "Do not ask for confirmation.")
     var yes: Bool
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")

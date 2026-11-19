@@ -120,6 +120,7 @@ let package = Package(
                 "SMTP",
                 "IMAP",
                 .product(name: "Frame", package: "Frame"),
+                .product(name: "Roots", package: "Frame"),
                 .product(name: "Milieu", package: "Milieu"),
                 .product(name: "Readers", package: "Readers"),
                 .product(name: "IO", package: "IO"),
@@ -138,8 +139,10 @@ let package = Package(
                 "MailIndex",
                 "MailFrame",
                 .product(name: "Frame", package: "Frame"),
+                .product(name: "Roots", package: "Frame"),
                 .product(name: "Arguments", package: "Arguments"),
                 .product(name: "Readers", package: "Readers"),
+                .product(name: "IO", package: "IO"),
             ],
             path: "Sources/MailCLI"
         ),
@@ -154,6 +157,9 @@ let package = Package(
                 "MailIndex",
                 "MailFrame",
                 .product(name: "Milieu", package: "Milieu"),
+                .product(name: "Roots", package: "Frame"),
+                .product(name: "Writers", package: "Writers"),
+                .product(name: "IO", package: "IO"),
                 .product(name: "Testing", package: "Testing"),
             ],
             path: "Testing/MailTests"

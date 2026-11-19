@@ -67,7 +67,7 @@ struct IndexOptions: Sendable, ArgumentGroup {
     @Opt("index", help: "Index file; ~/.local/share/mail/index/<account>.sqlite when absent.")
     var index: String?
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")
@@ -161,7 +161,7 @@ struct ClutterOptions: Sendable, ArgumentGroup {
     @Opt("index", help: "Index file; ~/.local/share/mail/index/<account>.sqlite when absent.")
     var index: String?
 
-    @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
+    @Opt("config", help: "One configuration directory alone; every root's .config/mail (your own, then shared roots in ~/.config/roots.frame) when absent.")
     var directory: String?
 
     @Opt("access", help: "Limit to a named access profile from the configuration.")

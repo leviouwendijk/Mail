@@ -59,9 +59,10 @@ extension EmailCLI {
     static func accounts(
         directory: String? = nil
     ) throws -> MailAccounts {
-        let url = directory.map { URL(fileURLWithPath: expandingTilde($0), isDirectory: true) }
-            ?? MailConfiguration.directory()
-        switch MailConfiguration.state(directory: url) {
+        let state = directory
+            .map { MailConfiguration.state(directory: URL(fileURLWithPath: expandingTilde($0), isDirectory: true)) }
+            ?? MailConfiguration.state()
+        switch state {
         case .loaded(let accounts):
             return accounts
         case .missing(let directory):
