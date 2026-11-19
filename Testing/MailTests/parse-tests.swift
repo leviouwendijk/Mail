@@ -67,4 +67,24 @@ enum ParseTests {
         ).utf8)
         try Expect.equal(ReceivedMessage(parsing: raw).text, "Café op de hoek", "Latin-1 and soft breaks")
     }
+
+    /// Saving keeps sender names inside the directory and never overwrites.
+    static func savesAttachments() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("mail-save-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let invoice = MailAttachment(filename: "factuur.pdf", contentType: "application/pdf", data: Data("pdf".utf8))
+        let first = try invoice.save(in: root, index: 0)
+        let second = try invoice.save(in: root, index: 0)
+        try Expect.equal(first.lastPathComponent, "factuur.pdf", "Keeps the name")
+        try Expect.equal(second.lastPathComponent, "factuur (2).pdf", "Never overwrites")
+
+        let escaping = MailAttachment(filename: "../../.ssh/config", data: Data("x".utf8))
+        let kept = try escaping.save(in: root, index: 1)
+        try Expect.equal(kept.deletingLastPathComponent().standardizedFileURL.path, root.standardizedFileURL.path, "Stays in the directory")
+        try Expect.equal(kept.lastPathComponent, "config", "Only the last component")
+
+        let unnamed = MailAttachment(filename: "..", data: Data("x".utf8))
+        try Expect.equal(unnamed.safeFilename(index: 2), "attachment-3", "Falls back to a numbered name")
+    }
 }

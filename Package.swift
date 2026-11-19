@@ -60,6 +60,8 @@ let package = Package(
             dependencies: [
                 .product(name: "Primitives", package: "Primitives"),
                 .product(name: "Readers", package: "Readers"),
+                .product(name: "Writers", package: "Writers"),
+                .product(name: "IO", package: "IO"),
                 .product(name: "Parsing", package: "Parsing"),
             ]
         ),
@@ -121,8 +123,6 @@ let package = Package(
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "Arguments", package: "Arguments"),
                 .product(name: "Readers", package: "Readers"),
-                .product(name: "Writers", package: "Writers"),
-                .product(name: "IO", package: "IO"),
             ],
             path: "Sources/MailCLI"
         ),

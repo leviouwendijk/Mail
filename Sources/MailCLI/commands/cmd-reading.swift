@@ -1,10 +1,8 @@
 import Arguments
 import Foundation
 import IMAP
-import IO
 import Mail
 import MailFrame
-import Writers
 
 enum ProbeCommand: BoundArgumentCommand {
     typealias Options = ProbeOptions
@@ -318,41 +316,9 @@ enum ReadCommand: BoundArgumentCommand {
                 return
             }
             for (index, attachment) in message.attachments.enumerated() {
-                let url = Self.freeURL(for: Self.safeName(attachment.filename, index: index), in: directory)
-                try FileWriter(url).write(attachment.data)
+                let url = try attachment.save(in: directory, index: index)
                 FileHandle.standardError.write(Data("Saved \(url.path)\n".utf8))
             }
-        }
-    }
-
-    /// A sender-chosen name reduced to one plain path component.
-    static func safeName(
-        _ filename: String,
-        index: Int
-    ) -> String {
-        let last = filename.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
-        let trimmed = last.trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespacesAndNewlines).union(.controlCharacters))
-        return trimmed.isEmpty ? "attachment-\(index + 1)" : trimmed
-    }
-
-    /// `name`, or `name (2)`, `name (3)`… when a file already has that name; nothing is overwritten.
-    static func freeURL(
-        for name: String,
-        in directory: URL
-    ) -> URL {
-        let url = directory.appendingPathComponent(name)
-        guard FileSystem.default.exists(url) else {
-            return url
-        }
-        let base = url.deletingPathExtension().lastPathComponent
-        let ext = url.pathExtension
-        var number = 2
-        while true {
-            let candidate = directory.appendingPathComponent("\(base) (\(number))" + (ext.isEmpty ? "" : ".\(ext)"))
-            if !FileSystem.default.exists(candidate) {
-                return candidate
-            }
-            number += 1
         }
     }
 }

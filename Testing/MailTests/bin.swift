@@ -64,6 +64,9 @@ enum MailTestSuite {
         Test("parse-legacy-charset") {
             try ParseTests.charset()
         }
+        Test("attachments-save-safely") {
+            try ParseTests.savesAttachments()
+        }
         Test("imap-values-and-literals") {
             try await IMAPTests.values()
         }
