@@ -55,6 +55,7 @@ let package = Package(
         .package(url: "https://github.com/leviouwendijk/IO.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Path.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Arguments.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/SQLite.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Testing.git", branch: "master"),
     ],
     targets: [
@@ -106,9 +107,7 @@ let package = Package(
                 "Mail",
                 "IMAP",
                 .product(name: "IO", package: "IO"),
-            ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3"),
+                .product(name: "SQLite", package: "SQLite"),
             ]
         ),
 

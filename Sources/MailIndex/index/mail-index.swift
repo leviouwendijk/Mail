@@ -1,5 +1,6 @@
 import Foundation
 import IMAP
+import SQLite
 import IO
 import Mail
 

@@ -1,5 +1,6 @@
 import Foundation
 import IMAP
+import SQLite
 
 /// Which messages a query looks at. Sent mail is left out unless asked for.
 public struct MailIndexFilter: Sendable, Equatable {

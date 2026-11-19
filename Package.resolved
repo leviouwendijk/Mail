@@ -1,5 +1,5 @@
 {
-  "originHash" : "20cf2a2e89c41636b913d5e87f3e3d95d1b66e6793f572ff809c465fe01ed6d5",
+  "originHash" : "00e26e714d4cd96b8173b3fb9310913904508d91e6b07df125218da870a94147",
   "pins" : [
     {
       "identity" : "arguments",
@@ -161,6 +161,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "af9a4e2d0b5da1239f53b405a3e04e636dd489c4"
+      }
+    },
+    {
+      "identity" : "sqlite",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/SQLite.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "0a871ee6bcb45375a583ff2cb9b34381325226cc"
       }
     },
     {
