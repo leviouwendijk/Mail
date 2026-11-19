@@ -75,6 +75,28 @@ email module    # editor completion and checking for .frame files
 email check     # validates, and says per server whether its password resolves
 ```
 
+## Setting up a teammate's machine
+
+A shared root configures the shared mailboxes once for everyone; each person
+only adds the root, their passwords and their own mailbox.
+
+1. Make the shared folder available (accept the iCloud share; keep it
+   downloaded).
+2. Declare it in `~/.config/roots.frame` as above. Leave out `.writable` for
+   someone whose tools should not change shared files.
+3. Set the `MAIL_PASSWORD_*` variables of the shared mailboxes they use (and
+   the SES login for sending). An unset password disables only that mailbox.
+4. Declare their own mailbox in `~/.config/mail/<group>/accounts.frame`,
+   referencing the shared provider (`.provider = hondenmeestersDomain`).
+5. Check: `email path` lists both roots and flags problems, `email check`
+   shows which passwords resolve, `email accounts` lists their own accounts
+   first, then the shared ones.
+
+Common problems: a shared root that "is not there" (share not accepted or not
+synced), a file "not downloaded from iCloud", a "sync conflict copy"
+(`accounts 2.frame`: merge and delete it), or a name "also declared in" the
+other root (rename your own).
+
 ## Values from the environment
 
 `host`, `port` and `username` take a literal or an environment variable:
