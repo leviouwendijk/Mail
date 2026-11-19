@@ -133,6 +133,9 @@ enum MailTestSuite {
         Test("plan-apply-verifies-journals-undoes") {
             try await PlanTests.applyAndUndo()
         }
+        Test("plan-mailbox-paths-in-server-form") {
+            try await PlanTests.dovecotNames()
+        }
         Test("plan-refuses-renumbered-mailbox") {
             try await PlanTests.renumbered()
         }

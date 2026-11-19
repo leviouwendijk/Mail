@@ -97,8 +97,10 @@ public struct MailPlanExecutor: Sendable {
                 let uids = verified.map(\.uid)
 
                 switch step.action {
-                case .move(let destination):
-                    if destination.uppercased() != "INBOX" {
+                case .move(let path):
+                    // `Review/Suspicious` in the server's own form, such as `INBOX.Review.Suspicious`.
+                    let destination = try await session.resolve(mailbox: path)
+                    if destination != "INBOX" {
                         try await session.create(destination)
                     }
                     let mapping = try await session.move(uids, to: destination)

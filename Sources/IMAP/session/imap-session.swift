@@ -418,6 +418,49 @@ public actor IMAPSession {
         try await raw(uid).map(ReceivedMessage.init(parsing:))
     }
 
+    /// The personal namespace (RFC 2342): its prefix, such as `INBOX.` on many
+    /// Dovecot servers, and its hierarchy separator. `nil` without `NAMESPACE`.
+    public func personalNamespace() async throws -> (prefix: String, delimiter: Character?)? {
+        guard hasCapability("NAMESPACE") else {
+            return nil
+        }
+        let responses = try await execute([.text("NAMESPACE")], name: "NAMESPACE")
+        guard let values = responses.first(where: { $0.first?.isAtom("NAMESPACE") == true }),
+              values.count >= 2,
+              let personal = values[1].list?.first?.list,
+              let prefix = personal.first?.text
+        else {
+            return nil
+        }
+        return (IMAPMailboxName.decode(prefix), personal.count > 1 ? personal[1].text?.first : nil)
+    }
+
+    /// The server's name for a mailbox path written with `/` between levels,
+    /// such as `Review/Suspicious`: an existing mailbox of that exact name
+    /// as is; otherwise `/` becomes the server's separator and the personal
+    /// namespace prefix is added, so Dovecot's `INBOX.` namespace gives
+    /// `INBOX.Review.Suspicious`. `INBOX` stays `INBOX`.
+    public func resolve(
+        mailbox path: String
+    ) async throws -> String {
+        if path.uppercased() == "INBOX" {
+            return "INBOX"
+        }
+        let listed = try await list()
+        if listed.contains(where: { $0.name == path }) {
+            return path
+        }
+        let namespace = try await personalNamespace()
+        let delimiter = namespace?.delimiter ?? listed.compactMap(\.delimiter).first ?? "/"
+        var name = delimiter == "/" ? path : path.replacingOccurrences(of: "/", with: String(delimiter))
+        if let prefix = namespace?.prefix, !prefix.isEmpty,
+           !name.hasPrefix(prefix), !name.uppercased().hasPrefix("INBOX")
+        {
+            name = prefix + name
+        }
+        return name
+    }
+
     /// The first mailbox advertising `role` (SPECIAL-USE).
     public func mailbox(
         for role: IMAPSpecialUse
@@ -443,6 +486,11 @@ public actor IMAPSession {
             return nil
         }
         return IMAPUID(uid)
+    }
+
+    /// One round trip that does nothing; for keeping a connection alive or timing it.
+    public func noop() async throws {
+        try await execute([.text("NOOP")], name: "NOOP")
     }
 
     public func logout() async throws {

@@ -23,6 +23,7 @@ enum EmailCommand: ArgumentCommand {
         PlansCommand.self,
         ApplyCommand.self,
         UndoCommand.self,
+        BenchCommand.self,
         ReadCommand.self,
         DraftCommand.self,
         SendCommand.self,

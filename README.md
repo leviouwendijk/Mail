@@ -40,6 +40,8 @@ email plan -a work --list deals.shop.example --older-than 90 --move-to Pruned
 email plans -a work                             # proposed, applied, undone
 email apply -a work <plan-id>                   # re-checks each message, acts, journals, re-syncs; never deletes
 email undo -a work <plan-id>                    # reverses it from the journal
+email bench -a work [-m INBOX.Archive]          # time the server: login, round trip, fetch per message (read-only)
+email bench -a work --write                     # also APPEND/MOVE/remove one test message of its own
 email read 4182 -a work -m INBOX                # headers, text, attachment list; never marks read
 email read 4182 -a work --save ~/Downloads/mail # also write its attachments (never overwrites)
 email read 4182 -a work --raw > message.eml     # the source as received
