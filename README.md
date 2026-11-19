@@ -12,7 +12,7 @@ third-party mail stack; the wire grammars use Parsing.
 | `MailConnection` | Transport shared by both protocols: TLS, STARTTLS, credentials, `MailServerConfiguration`. |
 | `SMTP` | `SMTPClient`: submit over implicit TLS (465) or STARTTLS (587), `verify` to test a login. |
 | `IMAP` | `IMAPClient` / `IMAPSession`: list, status, search with a typed query DSL (`IMAPSearch`), fetch summaries (optionally with chosen header fields and the `BODYSTRUCTURE` attachment tree, in batches) and messages, append. Fetching never marks mail read; selections are read-only unless selected writable, which enables `store` (flags), `copy`/`move` (with the UIDPLUS `COPYUID` mapping; `MOVE`, else copy + `UID EXPUNGE` of only those UIDs), `expunge` and `create`. Gmail extensions (search syntax, threads, labels, label changes) when the server offers them. |
-| `MailIndex` | `MailIndex`: a local SQLite index per account (over the `SQLite` package) (`~/.local/share/mail/index/<account>.sqlite`) of envelopes, flags, list and authentication headers and attachments, never bodies. Incremental `sync` (UIDNEXT, flag refresh, removals, UIDVALIDITY rebuilds), correspondents from Sent, `clutter` by sender/domain/list, `select` of UIDs per mailbox for later moves. |
+| `MailIndex` | `MailIndex`: a local SQLite index per account (over the `SQLite` package) (`~/.local/share/mail/index/<account>.sqlite`) of envelopes, flags, list and authentication headers and attachments, never bodies. Incremental `sync` (UIDNEXT, flag refresh, removals, UIDVALIDITY rebuilds), correspondents from Sent, `clutter` by sender/domain/list, `select` of UIDs per mailbox for later moves. Review: `suspicious(policy)` scores received mail (payment wording from unknown vendors, strangers, rare senders, DMARC/SPF/DKIM failures, Reply-To elsewhere, lookalike domains, risky attachments) with a reason per point; durable `decisions` (trust/block a sender or domain, record/dismiss a message) survive reindexing. |
 | `MailFrame` | The `Mail` Frame module and loader: accounts, providers, identities and access profiles from `~/.config/mail/**/*.frame`. |
 | `email` | The command line, over the same configuration. |
 
@@ -32,6 +32,9 @@ email search -a google --gmail 'has:attachment older_than:7d'
 email index -a work                             # sync the local index; read-only toward the server
 email clutter -a work --by domain --strangers   # biggest senders you never wrote to
 email clutter -a work --by list --order bytes
+email review -a work --days 30                  # suspicious mail (fake invoices, phishing) with reasons
+email review -a work --block domein-registratie.example --note 'fake renewal invoice'
+email review -a work --trust transip.nl         # or --record/--dismiss <uid> [-m mailbox]; --decisions lists them
 email read 4182 -a work -m INBOX                # headers, text, attachment list; never marks read
 email read 4182 -a work --save ~/Downloads/mail # also write its attachments (never overwrites)
 email read 4182 -a work --raw > message.eml     # the source as received

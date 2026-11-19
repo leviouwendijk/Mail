@@ -18,6 +18,7 @@ enum EmailCommand: ArgumentCommand {
         SearchCommand.self,
         IndexCommand.self,
         ClutterCommand.self,
+        ReviewCommand.self,
         ReadCommand.self,
         DraftCommand.self,
         SendCommand.self,

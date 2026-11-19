@@ -121,6 +121,15 @@ enum MailTestSuite {
         Test("index-header-fields") {
             try IndexTests.indexedFields()
         }
+        Test("review-scores-fake-invoice-and-phish") {
+            try await ReviewTests.scoring()
+        }
+        Test("review-decisions-trust-block-dismiss") {
+            try await ReviewTests.decisions()
+        }
+        Test("review-domain-lookalikes") {
+            try ReviewTests.domains()
+        }
         Test("imap-command-failure") {
             try await IMAPTests.failure()
         }

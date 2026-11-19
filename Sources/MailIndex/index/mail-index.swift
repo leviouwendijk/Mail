@@ -104,6 +104,15 @@ public actor MailIndex {
         last_sent REAL
     );
     CREATE INDEX IF NOT EXISTS correspondents_domain ON correspondents (domain);
+    -- Review decisions. Durable: syncing and reindexing never touch them.
+    CREATE TABLE IF NOT EXISTS decisions (
+        scope TEXT NOT NULL,
+        value TEXT NOT NULL,
+        verdict TEXT NOT NULL,
+        note TEXT,
+        decided_at REAL NOT NULL,
+        PRIMARY KEY (scope, value)
+    );
     """
 
     // MARK: - Mailbox state
