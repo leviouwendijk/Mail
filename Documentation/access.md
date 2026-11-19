@@ -65,11 +65,14 @@ is that an agent sees metadata by default and content only by grant:
   and writes to `mail/<account>/<mailbox>-<uid>/` under the exports directory
   of Agentic's `settings.frame` (`exports.directory`; by default
   `.agentic/artifacts/exports` in the workspace). It never overwrites.
-- **Writing.** `mail_draft` needs a `draft` grant. `mail_send` also follows
-  the account's `sending` policy:
+- **Writing.** `mail_draft` needs a `draft` grant. `mail_send` needs no grant:
+  the owner approves each message. The account's `sending` policy decides the rest:
   - `drafts`: refused;
   - `confirm`: the owner approves each message;
-  - `allowed`: sent without asking.
+  - `allowed`: the owner approves each message, unless the session holds a
+    `draft` grant on the account, in which case it sends without asking.
+
+  A reply (`reply_to_uid`) still needs read access to the original's mailbox.
 - **Profiles as a ceiling.** A host can start a session limited to an access
   profile (`Email.Scope`); requests beyond it are refused.
 
