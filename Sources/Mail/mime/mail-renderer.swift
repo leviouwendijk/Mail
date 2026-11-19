@@ -1,14 +1,20 @@
 import Foundation
 
-/// Renders a `MailMessage` into an RFC 5322 message. `Bcc` never appears in the output.
+/// Renders a `MailMessage` into an RFC 5322 message. `Bcc` is left out of what
+/// is delivered; the sender's own copies (Sent, Drafts) keep it with `keepsBcc`.
 public struct MailRenderer: Sendable {
     public var makeBoundary: @Sendable () -> String
     public var now: @Sendable () -> Date
+    /// Writes the `Bcc` header, for a copy only the sender sees: a Sent copy
+    /// records who was blind-copied, a draft keeps them when it is sent later.
+    public var keepsBcc: Bool
 
     public init(
+        keepsBcc: Bool = false,
         makeBoundary: @escaping @Sendable () -> String = { "=_mail_\(UUID().uuidString)" },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
+        self.keepsBcc = keepsBcc
         self.makeBoundary = makeBoundary
         self.now = now
     }
@@ -45,6 +51,9 @@ public struct MailRenderer: Sendable {
         }
         if !message.cc.isEmpty {
             headers.append(MailHeaderField("Cc", Self.addressList(message.cc)))
+        }
+        if keepsBcc, !message.bcc.isEmpty {
+            headers.append(MailHeaderField("Bcc", Self.addressList(message.bcc)))
         }
         if !message.replyTo.isEmpty {
             headers.append(MailHeaderField("Reply-To", Self.addressList(message.replyTo)))

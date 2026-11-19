@@ -172,7 +172,7 @@ enum DraftCommand: BoundArgumentCommand {
     ) async throws {
         let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
         let (account, message) = try options.compose(in: accounts, access: access)
-        let data = MailRenderer().data(message)
+        let data = MailRenderer(keepsBcc: true).data(message)
         let folder = try await EmailCLI.imap(account, in: accounts).session { session in
             let folder = try await EmailCLI.folder(.drafts, for: account, in: session) ?? "Drafts"
             try await session.append(data, to: folder, flags: [.draft, .seen])
@@ -222,7 +222,7 @@ enum SendCommand: BoundArgumentCommand {
         if account.savesSentMail {
             print("The provider files sent mail itself; no copy saved.")
         } else if let imap = accounts.imapClient(for: account) {
-            let data = MailRenderer().data(message)
+            let data = MailRenderer(keepsBcc: true).data(message)
             do {
                 let folder = try await imap.session { session -> String? in
                     guard let folder = try await EmailCLI.folder(.sent, for: account, in: session) else {

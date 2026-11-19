@@ -55,6 +55,8 @@ enum RenderTests {
             ["jan@example.org", "secret@example.net"],
             "Envelope still includes Bcc"
         )
+        let own = MailRenderer(keepsBcc: true).rendered(message)
+        try Expect.contains(own, "Bcc: secret@example.net", "The sender's copy records Bcc")
     }
 
     /// HTML alone gets a text version; a signature lands inside a full document.

@@ -213,8 +213,14 @@ struct SearchOptions: Sendable, ArgumentGroup {
     @Opt("from", short: "f", help: "Sender contains.")
     var from: String?
 
-    @Opt("to", help: "Recipient contains.")
+    @Opt("to", help: "To header contains.")
     var to: String?
+
+    @Opt("cc", help: "Cc header contains.")
+    var cc: String?
+
+    @Opt("addressed", help: "To or Cc header contains: mail addressed to someone, either way.")
+    var addressed: String?
 
     @Opt("subject", short: "s", help: "Subject contains.")
     var subject: String?
@@ -251,6 +257,8 @@ struct SearchOptions: Sendable, ArgumentGroup {
         if flagged { criteria.append(.flagged) }
         if let from { criteria.append(.from(from)) }
         if let to { criteria.append(.to(to)) }
+        if let cc { criteria.append(.cc(cc)) }
+        if let addressed { criteria.append(.or(.to(addressed), .cc(addressed))) }
         if let subject { criteria.append(.subject(subject)) }
         if let text { criteria.append(.text(text)) }
         if let since { criteria.append(.since(try EmailCLI.day(since))) }
