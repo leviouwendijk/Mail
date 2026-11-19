@@ -1,8 +1,10 @@
 import Arguments
 import Foundation
 import IMAP
+import IO
 import Mail
 import MailFrame
+import Writers
 
 enum ProbeCommand: BoundArgumentCommand {
     typealias Options = ProbeOptions
@@ -268,7 +270,7 @@ enum ReadCommand: BoundArgumentCommand {
 
     static func components() throws -> [CommandComponentLowerable] {
         [
-            about("Print one message by UID (from email search). Does not mark it read."),
+            about("Print one message by UID (from email search), or its source with --raw; --save writes its attachments. Does not mark it read."),
             try params(Options.self),
         ]
     }
@@ -283,13 +285,18 @@ enum ReadCommand: BoundArgumentCommand {
         let (accounts, access) = try EmailCLI.scope(directory: options.directory, access: options.access)
         let account = try EmailCLI.account(options.account, in: accounts, access: access)
         try access.check(mailbox: options.mailbox)
-        let message = try await EmailCLI.imap(account, in: accounts).session { session in
+        let source = try await EmailCLI.imap(account, in: accounts).session { session in
             try await session.select(options.mailbox)
-            return try await session.message(IMAPUID(UInt32(clamping: options.uid)))
+            return try await session.raw(IMAPUID(UInt32(clamping: options.uid)))
         }
-        guard let message else {
+        guard let source else {
             throw EmailCLIError.notFound(uid: options.uid, mailbox: options.mailbox)
         }
+        if options.raw {
+            FileHandle.standardOutput.write(source)
+            return
+        }
+        let message = ReceivedMessage(parsing: source)
 
         print("From:    \(message.from.map(EmailCLI.display).joined(separator: ", "))")
         print("To:      \(message.to.map(EmailCLI.display).joined(separator: ", "))")
@@ -303,6 +310,50 @@ enum ReadCommand: BoundArgumentCommand {
         }
         print("")
         print(message.readableText ?? "")
+
+        if let save = options.save {
+            let directory = URL(fileURLWithPath: (save as NSString).expandingTildeInPath, isDirectory: true)
+            guard !message.attachments.isEmpty else {
+                FileHandle.standardError.write(Data("No attachments to save.\n".utf8))
+                return
+            }
+            for (index, attachment) in message.attachments.enumerated() {
+                let url = Self.freeURL(for: Self.safeName(attachment.filename, index: index), in: directory)
+                try FileWriter(url).write(attachment.data)
+                FileHandle.standardError.write(Data("Saved \(url.path)\n".utf8))
+            }
+        }
+    }
+
+    /// A sender-chosen name reduced to one plain path component.
+    static func safeName(
+        _ filename: String,
+        index: Int
+    ) -> String {
+        let last = filename.split(whereSeparator: { $0 == "/" || $0 == "\\" }).last.map(String.init) ?? ""
+        let trimmed = last.trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespacesAndNewlines).union(.controlCharacters))
+        return trimmed.isEmpty ? "attachment-\(index + 1)" : trimmed
+    }
+
+    /// `name`, or `name (2)`, `name (3)`… when a file already has that name; nothing is overwritten.
+    static func freeURL(
+        for name: String,
+        in directory: URL
+    ) -> URL {
+        let url = directory.appendingPathComponent(name)
+        guard FileSystem.default.exists(url) else {
+            return url
+        }
+        let base = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        var number = 2
+        while true {
+            let candidate = directory.appendingPathComponent("\(base) (\(number))" + (ext.isEmpty ? "" : ".\(ext)"))
+            if !FileSystem.default.exists(candidate) {
+                return candidate
+            }
+            number += 1
+        }
     }
 }
 
@@ -315,6 +366,12 @@ struct ReadOptions: Sendable, ArgumentGroup {
 
     @Opt("mailbox", short: "m", default: "INBOX", help: "Mailbox holding the message.")
     var mailbox: String
+
+    @Opt("save", help: "Save its attachments into this directory; existing files are kept.")
+    var save: String?
+
+    @Flag("raw", help: "Print the message source as received.")
+    var raw: Bool
 
     @Opt("config", help: "Configuration directory; ~/.config/mail when absent.")
     var directory: String?

@@ -81,10 +81,25 @@ public struct ReceivedMessage: Sendable, Equatable {
             disposition = .attachment
         }
         return MailAttachment(
-            filename: part.filename ?? "part",
+            filename: part.filename ?? "part" + (Self.fileExtensions[part.contentType.value].map { ".\($0)" } ?? ""),
             contentType: part.contentType.value,
             data: part.body,
             disposition: disposition
         )
     }
+
+    /// Extensions for unnamed parts, so a saved part opens with the right application.
+    static let fileExtensions: [String: String] = [
+        "message/rfc822": "eml",
+        "message/delivery-status": "txt",
+        "message/disposition-notification": "txt",
+        "text/plain": "txt",
+        "text/html": "html",
+        "text/calendar": "ics",
+        "application/pdf": "pdf",
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/gif": "gif",
+        "application/zip": "zip",
+    ]
 }

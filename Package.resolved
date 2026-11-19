@@ -1,5 +1,5 @@
 {
-  "originHash" : "e046f271c80c50c296ecc8c9e4fffab281736de2cadd0ef0b64a3a4eb03084dc",
+  "originHash" : "20cf2a2e89c41636b913d5e87f3e3d95d1b66e6793f572ff809c465fe01ed6d5",
   "pins" : [
     {
       "identity" : "arguments",
@@ -97,7 +97,7 @@
       "location" : "https://github.com/leviouwendijk/Milieu.git",
       "state" : {
         "branch" : "master",
-        "revision" : "5b6211d7b2207c8b999012584c48a33f25f15668"
+        "revision" : "8b707f48391112c86eed1c26ab354e82343f24d6"
       }
     },
     {
@@ -188,6 +188,15 @@
       "state" : {
         "branch" : "master",
         "revision" : "3e118cecca53a964099a0afe495e53fe9b325ff0"
+      }
+    },
+    {
+      "identity" : "writers",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Writers.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "9f846f6bb04ec29a78480d9f45db41d68a2d27a9"
       }
     }
   ],

@@ -28,7 +28,9 @@ email mailboxes -a work --counts
 email search --unread --since 2026-11-01
 email search --in 'hondenmeesters:@junk' --subject factuur
 email search -a google --gmail 'has:attachment older_than:7d'
-email read 4182 -a work -m INBOX
+email read 4182 -a work -m INBOX                # headers, text, attachment list; never marks read
+email read 4182 -a work --save ~/Downloads/mail # also write its attachments (never overwrites)
+email read 4182 -a work --raw > message.eml     # the source as received
 email draft -a work --to client@example.org -s 'Afspraak' -b '…'
 email send  -a work --to client@example.org -s 'Afspraak' --body-file note.txt --attach plan.pdf
 ```

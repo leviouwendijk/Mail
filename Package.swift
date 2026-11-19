@@ -44,6 +44,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/leviouwendijk/Primitives.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Readers.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/Writers.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Parsing.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Milieu.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Frame.git", branch: "master"),
@@ -120,6 +121,8 @@ let package = Package(
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "Arguments", package: "Arguments"),
                 .product(name: "Readers", package: "Readers"),
+                .product(name: "Writers", package: "Writers"),
+                .product(name: "IO", package: "IO"),
             ],
             path: "Sources/MailCLI"
         ),
