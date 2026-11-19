@@ -57,6 +57,25 @@ enum RenderTests {
         )
     }
 
+    /// HTML alone gets a text version; a signature lands inside a full document.
+    static func htmlBody() throws {
+        let body = try Expect.notNil(MailBody(text: nil, html: "<html><body><p>Hoi <b>Jan</b>,</p><p>Zie bijlage.</p></body></html>"), "HTML body")
+        guard case .alternative(let text, let html) = body else {
+            throw TestFlowAssertionFailure(label: "body", message: "expected an alternative body")
+        }
+        try Expect.equal(text, "Hoi Jan,\nZie bijlage.", "Text derived from HTML")
+        try Expect.isNil(MailBody(text: " ", html: nil), "Empty is no body")
+
+        let signed = MailSignature(text: "Levi").signing(.html(html))
+        guard case .html(let content) = signed else {
+            throw TestFlowAssertionFailure(label: "signed", message: "expected HTML")
+        }
+        try Expect.true(content.hasSuffix("<div class=\"signature\">Levi</div>\n</body></html>"), "Signature before </body>: \(content)")
+
+        try Expect.equal(MailAttachment.contentType(forExtension: "PDF"), "application/pdf", "Type from extension")
+        try Expect.equal(MailAttachment.contentType(forExtension: "xyz"), "application/octet-stream", "Unknown is octet-stream")
+    }
+
     private static func split(
         _ output: String
     ) -> (String, String) {

@@ -27,17 +27,50 @@ public struct MailAttachment: Sendable, Equatable {
         self.disposition = disposition
     }
 
+    /// The file's bytes; the content type from its extension when not given.
     public static func file(
         at url: URL,
-        contentType: String = "application/octet-stream",
+        contentType: String? = nil,
         disposition: Disposition = .attachment
     ) throws -> MailAttachment {
         MailAttachment(
             filename: url.lastPathComponent,
-            contentType: contentType,
+            contentType: contentType ?? Self.contentType(forExtension: url.pathExtension),
             data: try DataFileReader(url).read().data,
             disposition: disposition
         )
+    }
+
+    /// A MIME type for a file extension; `application/octet-stream` when unknown.
+    public static func contentType(
+        forExtension ext: String
+    ) -> String {
+        switch ext.lowercased() {
+        case "pdf": return "application/pdf"
+        case "html", "htm": return "text/html"
+        case "txt", "md": return "text/plain"
+        case "csv": return "text/csv"
+        case "ics": return "text/calendar"
+        case "json": return "application/json"
+        case "xml": return "application/xml"
+        case "png": return "image/png"
+        case "jpg", "jpeg": return "image/jpeg"
+        case "gif": return "image/gif"
+        case "webp": return "image/webp"
+        case "svg": return "image/svg+xml"
+        case "heic": return "image/heic"
+        case "zip": return "application/zip"
+        case "eml": return "message/rfc822"
+        case "doc": return "application/msword"
+        case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "xls": return "application/vnd.ms-excel"
+        case "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        case "pptx": return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        case "mp4": return "video/mp4"
+        case "mov": return "video/quicktime"
+        case "mp3": return "audio/mpeg"
+        default: return "application/octet-stream"
+        }
     }
 
     public var isInline: Bool {

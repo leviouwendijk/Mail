@@ -52,6 +52,9 @@ enum MailTestSuite {
         Test("render-omits-bcc-keeps-envelope") {
             try RenderTests.bcc()
         }
+        Test("render-html-body-and-signature") {
+            try RenderTests.htmlBody()
+        }
         Test("parse-headers-addresses-dates") {
             try ParseTests.headers()
         }

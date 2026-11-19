@@ -41,7 +41,12 @@ public struct MailSignature: Sendable, Equatable {
         guard let html = html ?? text.map(Self.paragraphs) else {
             return content
         }
-        return content + "\n<div class=\"signature\">\(html)</div>"
+        let block = "<div class=\"signature\">\(html)</div>"
+        // Inside a full document, the signature goes before </body>, not after </html>.
+        if let end = content.range(of: "</body>", options: [.caseInsensitive, .backwards]) {
+            return content.replacingCharacters(in: end, with: block + "\n</body>")
+        }
+        return content + "\n" + block
     }
 
     private static func plain(

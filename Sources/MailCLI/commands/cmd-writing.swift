@@ -30,6 +30,12 @@ struct ComposeOptions: Sendable, ArgumentGroup {
     @Opt("body-file", help: "Read the body from a file; - for standard input.")
     var bodyFile: String?
 
+    @Opt("html", help: "HTML body; a text version is derived unless --body or --body-file is given too.")
+    var html: String?
+
+    @Opt("html-file", help: "Read the HTML body from a file.")
+    var htmlFile: String?
+
     @Opts("attach", help: "Attach a file; repeatable.")
     var attachments: [String]
 
@@ -68,7 +74,7 @@ struct ComposeOptions: Sendable, ArgumentGroup {
             cc: cc,
             bcc: bcc,
             subject: subject,
-            body: .text(try bodyText()),
+            body: try body(),
             attachments: attached
         )
         return (account, message)
@@ -94,17 +100,19 @@ struct ComposeOptions: Sendable, ArgumentGroup {
         return identity
     }
 
-    private func bodyText() throws -> String {
-        if let body {
-            return body
+    private func body() throws -> MailBody {
+        let text: String? = try body ?? bodyFile.map { file in
+            file == "-"
+                ? String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+                : try TextFileReader(URL(fileURLWithPath: EmailCLI.expandingTilde(file))).read().text
         }
-        guard let bodyFile else {
-            throw EmailCLIError.missing("Give the body with --body or --body-file.")
+        let html: String? = try html ?? htmlFile.map {
+            try TextFileReader(URL(fileURLWithPath: EmailCLI.expandingTilde($0))).read().text
         }
-        if bodyFile == "-" {
-            return String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
+        guard let body = MailBody(text: text, html: html) else {
+            throw EmailCLIError.missing("Give the body with --body, --body-file, --html or --html-file.")
         }
-        return try TextFileReader(URL(fileURLWithPath: EmailCLI.expandingTilde(bodyFile))).read().text
+        return body
     }
 }
 
@@ -123,6 +131,11 @@ extension EmailCLI {
             lines.append("Bcc:     \(message.bcc.map(display).joined(separator: ", "))")
         }
         lines.append("Subject: \(message.subject)")
+        switch message.body {
+        case .text: lines.append("Body:    text")
+        case .html: lines.append("Body:    HTML")
+        case .alternative: lines.append("Body:    HTML with a text version")
+        }
         for attachment in message.attachments {
             lines.append("Attach:  \(attachment.filename) (\(attachment.data.count) bytes)")
         }

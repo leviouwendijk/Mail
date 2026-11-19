@@ -4,6 +4,26 @@ public enum MailBody: Sendable, Equatable {
     case text(String)
     case html(String)
     case alternative(text: String, html: String)
+
+    /// Text, HTML or both; HTML alone gets a text version derived from it, so
+    /// clients that show no HTML still read the message. `nil` when both are empty.
+    public init?(
+        text: String?,
+        html: String?
+    ) {
+        let text = text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        let html = html.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        switch (text, html) {
+        case (let text?, let html?):
+            self = .alternative(text: text, html: html)
+        case (nil, let html?):
+            self = .alternative(text: ReceivedMessage.plainText(fromHTML: html), html: html)
+        case (let text?, nil):
+            self = .text(text)
+        case (nil, nil):
+            return nil
+        }
+    }
 }
 
 public struct MailHeaderField: Sendable, Equatable {
