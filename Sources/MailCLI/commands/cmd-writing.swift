@@ -74,7 +74,7 @@ struct ComposeOptions: Sendable, ArgumentGroup {
             cc: cc,
             bcc: bcc,
             subject: subject,
-            body: try body(),
+            body: try messageBody(),
             attachments: attached
         )
         return (account, message)
@@ -100,7 +100,7 @@ struct ComposeOptions: Sendable, ArgumentGroup {
         return identity
     }
 
-    private func body() throws -> MailBody {
+    private func messageBody() throws -> MailBody {
         let text: String? = try body ?? bodyFile.map { file in
             file == "-"
                 ? String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
