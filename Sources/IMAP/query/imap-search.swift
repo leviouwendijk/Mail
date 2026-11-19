@@ -52,6 +52,9 @@ public indirect enum IMAPSearch: Sendable, Equatable {
     case larger(Int)
     case smaller(Int)
     case uids([IMAPUID])
+    /// `start:*`, for syncing from a known `UIDNEXT`. The server always includes the
+    /// newest message, even when its UID is below `start`, so filter the result.
+    case uidsFrom(IMAPUID)
 
     /// Gmail's own search syntax, such as `has:attachment older_than:7d` (needs `X-GM-EXT-1`).
     case gmail(String)
@@ -192,6 +195,7 @@ public indirect enum IMAPSearch: Sendable, Equatable {
         case .larger(let size): return [.text("LARGER"), .text(String(size))]
         case .smaller(let size): return [.text("SMALLER"), .text(String(size))]
         case .uids(let uids): return [.text("UID"), .text(uids.isEmpty ? "0" : IMAPUID.set(uids))]
+        case .uidsFrom(let start): return [.text("UID"), .text("\(start):*")]
         case .gmail(let query): return string("X-GM-RAW", query)
         case .gmailThread(let thread): return [.text("X-GM-THRID"), .text(thread.filter(\.isNumber))]
 

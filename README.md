@@ -11,7 +11,7 @@ third-party mail stack; the wire grammars use Parsing.
 | `Mail` | The message model (`MailMessage`, `EmailAddress`, identities, signatures, attachments), MIME rendering and parsing (`MailRenderer`, `MIMEParser`, `ReceivedMessage`). |
 | `MailConnection` | Transport shared by both protocols: TLS, STARTTLS, credentials, `MailServerConfiguration`. |
 | `SMTP` | `SMTPClient`: submit over implicit TLS (465) or STARTTLS (587), `verify` to test a login. |
-| `IMAP` | `IMAPClient` / `IMAPSession`: list, status, search with a typed query DSL (`IMAPSearch`), fetch summaries and messages, append. Read-only toward flags: fetching never marks mail read. Gmail extensions (search syntax, threads, labels) when the server offers them. |
+| `IMAP` | `IMAPClient` / `IMAPSession`: list, status, search with a typed query DSL (`IMAPSearch`), fetch summaries (optionally with chosen header fields and the `BODYSTRUCTURE` attachment tree, in batches) and messages, append. Fetching never marks mail read; selections are read-only unless selected writable, which enables `store` (flags), `copy`/`move` (with the UIDPLUS `COPYUID` mapping; `MOVE`, else copy + `UID EXPUNGE` of only those UIDs), `expunge` and `create`. Gmail extensions (search syntax, threads, labels, label changes) when the server offers them. |
 | `MailFrame` | The `Mail` Frame module and loader: accounts, providers, identities and access profiles from `~/.config/mail/**/*.frame`. |
 | `email` | The command line, over the same configuration. |
 

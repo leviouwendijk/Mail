@@ -2,8 +2,24 @@ import Foundation
 import Mail
 import MailConnection
 
-/// A read-only IMAP conversation over an open transport. Fetches use `BODY.PEEK`,
-/// so reading a message never marks it seen.
+/// How `store` applies flags or labels: `+`, `-` or replace.
+public enum IMAPStoreOperation: Sendable {
+    case add
+    case remove
+    case replace
+
+    var prefix: String {
+        switch self {
+        case .add: return "+"
+        case .remove: return "-"
+        case .replace: return ""
+        }
+    }
+}
+
+/// An IMAP conversation over an open transport. Fetches use `BODY.PEEK`, so
+/// reading a message never marks it seen. Selections are read-only (`EXAMINE`)
+/// unless asked otherwise; flag changes, moves and expunges need a writable one.
 public actor IMAPSession {
     public let transport: any MailTransport
     public private(set) var capabilities: Set<String> = []
@@ -182,23 +198,36 @@ public actor IMAPSession {
     }
 
     /// Flags, dates, size and envelope for `uids` in the selected mailbox, in UID order.
+    /// `headers` adds those header fields (such as `List-Id`); `structure` adds the MIME tree.
     public func summaries(
-        _ uids: [IMAPUID]
+        _ uids: [IMAPUID],
+        headers: [String] = [],
+        structure: Bool = false
     ) async throws -> [IMAPMessageSummary] {
         guard !uids.isEmpty else {
             return []
         }
         let gmail = supportsGmailExtensions
-        let items = try await fetch(
-            uids,
-            items: gmail
-                ? "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE X-GM-THRID X-GM-MSGID X-GM-LABELS)"
-                : "(UID FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)"
-        )
-        return try items.compactMap { values -> IMAPMessageSummary? in
+        var items = ["UID", "FLAGS", "INTERNALDATE", "RFC822.SIZE", "ENVELOPE"]
+        if gmail {
+            items += ["X-GM-THRID", "X-GM-MSGID", "X-GM-LABELS"]
+        }
+        let fields = headers.map { $0.filter { $0.isLetter || $0.isNumber || $0 == "-" }.uppercased() }.filter { !$0.isEmpty }
+        if !fields.isEmpty {
+            items.append("BODY.PEEK[HEADER.FIELDS (\(fields.joined(separator: " ")))]")
+        }
+        if structure {
+            items.append("BODYSTRUCTURE")
+        }
+
+        let fetched = try await fetch(uids, items: "(" + items.joined(separator: " ") + ")")
+        return try fetched.compactMap { values -> IMAPMessageSummary? in
             guard let uid = values["UID"]?.number else {
                 return nil
             }
+            let headerBlock = fields.isEmpty
+                ? nil
+                : values.first { $0.key.hasPrefix("BODY[HEADER.FIELDS") }?.value.data
             return IMAPMessageSummary(
                 uid: IMAPUID(UInt32(uid)),
                 flags: Set((values["FLAGS"]?.list ?? []).compactMap(\.text).map { IMAPFlag($0) }),
@@ -211,10 +240,151 @@ public actor IMAPSession {
                     labels: (values["X-GM-LABELS"]?.list ?? []).compactMap(\.text).map { label in
                         label.hasPrefix("\\") ? label : IMAPMailboxName.decode(label)
                     }
-                ) : nil
+                ) : nil,
+                headers: fields.isEmpty ? nil : MailHeaders.parse(headerBlock ?? Data()),
+                structure: structure ? try values["BODYSTRUCTURE"].map(IMAPBodyStructure.init) : nil
             )
         }
         .sorted { $0.uid < $1.uid }
+    }
+
+    /// Summaries in batches of `batchSize` UIDs, so a large mailbox streams instead
+    /// of arriving as one response.
+    public func summaries(
+        _ uids: [IMAPUID],
+        headers: [String] = [],
+        structure: Bool = false,
+        batchSize: Int,
+        each: ([IMAPMessageSummary]) async throws -> Void
+    ) async throws {
+        let sorted = Set(uids).sorted()
+        var start = 0
+        while start < sorted.count {
+            let end = min(start + max(1, batchSize), sorted.count)
+            try await each(try await summaries(Array(sorted[start..<end]), headers: headers, structure: structure))
+            start = end
+        }
+    }
+
+    // MARK: - Changes
+
+    /// Adds, removes or replaces flags on `uids` in the writable selection.
+    public func store(
+        _ flags: Set<IMAPFlag>,
+        _ operation: IMAPStoreOperation = .add,
+        on uids: [IMAPUID]
+    ) async throws {
+        try requireWritable()
+        let list = "(" + flags.map(\.rawValue).sorted().joined(separator: " ") + ")"
+        for set in IMAPUID.sets(uids) {
+            try await execute(
+                [.text("UID STORE"), .text(set), .text("\(operation.prefix)FLAGS.SILENT"), .text(list)],
+                name: "STORE"
+            )
+        }
+    }
+
+    /// Adds, removes or replaces Gmail labels on `uids` (needs `X-GM-EXT-1`). System
+    /// labels keep their backslash, such as `\Inbox`; removing `\Inbox` archives.
+    public func storeLabels(
+        _ labels: Set<String>,
+        _ operation: IMAPStoreOperation = .add,
+        on uids: [IMAPUID]
+    ) async throws {
+        guard supportsGmailExtensions else {
+            throw IMAPError.unsupported(capability: "X-GM-EXT-1")
+        }
+        try requireWritable()
+        let list = "(" + labels.sorted().map { label -> String in
+            if label.hasPrefix("\\") {
+                return label
+            }
+            if case .text(let quoted) = IMAPCommandPart.mailbox(label) {
+                return quoted
+            }
+            return label
+        }.joined(separator: " ") + ")"
+        for set in IMAPUID.sets(uids) {
+            try await execute(
+                [.text("UID STORE"), .text(set), .text("\(operation.prefix)X-GM-LABELS"), .text(list)],
+                name: "STORE"
+            )
+        }
+    }
+
+    /// Copies `uids` to `mailbox`; the mapping when the server reports it (UIDPLUS).
+    @discardableResult
+    public func copy(
+        _ uids: [IMAPUID],
+        to mailbox: String
+    ) async throws -> IMAPUIDMapping? {
+        var mapping: IMAPUIDMapping?
+        for set in IMAPUID.sets(uids) {
+            let (_, statuses, tagged) = try await run([.text("UID COPY"), .text(set), .mailbox(mailbox)], name: "COPY")
+            mapping = IMAPUIDMapping.merging(mapping, codes: [tagged.code] + statuses.map(\.code))
+        }
+        return mapping
+    }
+
+    /// Moves `uids` to `mailbox` with `MOVE` (RFC 6851), else `COPY`, `\Deleted` and
+    /// `UID EXPUNGE` (UIDPLUS). Never a plain `EXPUNGE`, which would also remove
+    /// other messages already marked deleted; without either extension it refuses.
+    @discardableResult
+    public func move(
+        _ uids: [IMAPUID],
+        to mailbox: String
+    ) async throws -> IMAPUIDMapping? {
+        try requireWritable()
+        guard !uids.isEmpty else {
+            return nil
+        }
+        guard hasCapability("MOVE") else {
+            guard hasCapability("UIDPLUS") else {
+                throw IMAPError.unsupported(capability: "MOVE or UIDPLUS")
+            }
+            let mapping = try await copy(uids, to: mailbox)
+            try await store([.deleted], .add, on: uids)
+            try await expunge(uids)
+            return mapping
+        }
+
+        var mapping: IMAPUIDMapping?
+        for set in IMAPUID.sets(uids) {
+            // The mapping arrives in an untagged OK before the expunges.
+            let (_, statuses, tagged) = try await run([.text("UID MOVE"), .text(set), .mailbox(mailbox)], name: "MOVE")
+            mapping = IMAPUIDMapping.merging(mapping, codes: statuses.map(\.code) + [tagged.code])
+        }
+        return mapping
+    }
+
+    /// Permanently removes `uids` that are marked `\Deleted`, and only those (UIDPLUS).
+    public func expunge(
+        _ uids: [IMAPUID]
+    ) async throws {
+        try requireWritable()
+        guard hasCapability("UIDPLUS") else {
+            throw IMAPError.unsupported(capability: "UIDPLUS")
+        }
+        for set in IMAPUID.sets(uids) {
+            try await execute([.text("UID EXPUNGE"), .text(set)], name: "EXPUNGE")
+        }
+    }
+
+    /// Creates `mailbox`; one that already exists is not an error.
+    public func create(
+        _ mailbox: String
+    ) async throws {
+        do {
+            try await execute([.text("CREATE"), .mailbox(mailbox)], name: "CREATE")
+        } catch IMAPError.commandFailed(_, let status) where status.code == "ALREADYEXISTS" {
+            return
+        }
+    }
+
+    private func requireWritable() throws {
+        guard let selected, !selected.readOnly else {
+            throw IMAPError.notWritable(mailbox: selected?.mailbox)
+        }
     }
 
     /// The full raw message, without setting `\Seen`.
@@ -277,10 +447,13 @@ public actor IMAPSession {
         _ uids: [IMAPUID],
         items: String
     ) async throws -> [[String: IMAPValue]] {
-        let responses = try await execute(
-            [.text("UID FETCH"), .text(IMAPUID.set(uids)), .text(items)],
-            name: "FETCH"
-        )
+        var responses: [[IMAPValue]] = []
+        for set in IMAPUID.sets(uids) {
+            responses += try await execute(
+                [.text("UID FETCH"), .text(set), .text(items)],
+                name: "FETCH"
+            )
+        }
         return responses.compactMap { values in
             guard values.count >= 3, values[1].isAtom("FETCH"), let list = values[2].list else {
                 return nil

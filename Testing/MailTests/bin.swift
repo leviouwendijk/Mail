@@ -100,6 +100,21 @@ enum MailTestSuite {
         Test("gmail-thread-ids-and-labels") {
             try await GmailTests.threadsAndLabels()
         }
+        Test("imap-uid-sets-and-copyuid") {
+            try IMAPChangeTests.uidSets()
+        }
+        Test("imap-bodystructure-attachments") {
+            try IMAPChangeTests.bodyStructure()
+        }
+        Test("imap-move-flag-and-header-fields") {
+            try await IMAPChangeTests.moveAndFlag()
+        }
+        Test("imap-move-fallback-uid-expunge") {
+            try await IMAPChangeTests.moveFallback()
+        }
+        Test("gmail-label-and-archive") {
+            try await IMAPChangeTests.gmailLabels()
+        }
         Test("imap-command-failure") {
             try await IMAPTests.failure()
         }

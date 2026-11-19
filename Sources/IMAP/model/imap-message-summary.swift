@@ -80,6 +80,10 @@ public struct IMAPMessageSummary: Sendable, Equatable {
     public let envelope: IMAPEnvelope?
     /// Present on Gmail servers.
     public let gmail: IMAPGmailAttributes?
+    /// The header fields asked for, when any were.
+    public let headers: MailHeaders?
+    /// Present when the MIME structure was asked for.
+    public let structure: IMAPBodyStructure?
 
     public var isUnread: Bool {
         !flags.contains(.seen)

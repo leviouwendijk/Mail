@@ -9,6 +9,8 @@ public enum IMAPError: Error, Sendable, Equatable {
     case connectionEnded(IMAPStatusText)
     /// The query or fetch needs a capability the server does not advertise.
     case unsupported(capability: String)
+    /// A change needs a mailbox selected with `select(_:readOnly: false)`.
+    case notWritable(mailbox: String?)
 }
 
 extension IMAPError: LocalizedError {
@@ -29,6 +31,11 @@ extension IMAPError: LocalizedError {
             return "The IMAP server ended the connection: \(status.text)"
         case .unsupported(let capability):
             return "The IMAP server does not support \(capability)."
+        case .notWritable(let mailbox):
+            if let mailbox {
+                return "\(mailbox) is selected read-only; select it with readOnly: false to change messages."
+            }
+            return "No mailbox is selected; select one with readOnly: false to change messages."
         }
     }
 }
