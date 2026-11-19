@@ -266,6 +266,23 @@ public actor IMAPSession {
         }
     }
 
+    /// Only the flags of `uids`; cheap enough to refresh a whole mailbox.
+    public func flags(
+        _ uids: [IMAPUID]
+    ) async throws -> [IMAPUID: Set<IMAPFlag>] {
+        guard !uids.isEmpty else {
+            return [:]
+        }
+        var result: [IMAPUID: Set<IMAPFlag>] = [:]
+        for values in try await fetch(uids, items: "(UID FLAGS)") {
+            guard let uid = values["UID"]?.number else {
+                continue
+            }
+            result[IMAPUID(UInt32(uid))] = Set((values["FLAGS"]?.list ?? []).compactMap(\.text).map { IMAPFlag($0) })
+        }
+        return result
+    }
+
     // MARK: - Changes
 
     /// Adds, removes or replaces flags on `uids` in the writable selection.

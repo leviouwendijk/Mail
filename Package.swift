@@ -25,6 +25,10 @@ let package = Package(
             targets: ["IMAP"]
         ),
         .library(
+            name: "MailIndex",
+            targets: ["MailIndex"]
+        ),
+        .library(
             name: "MailFrame",
             targets: ["MailFrame"]
         ),
@@ -95,6 +99,19 @@ let package = Package(
             ]
         ),
 
+        // local SQLite index of envelopes, flags and attachments for counting and selecting
+        .target(
+            name: "MailIndex",
+            dependencies: [
+                "Mail",
+                "IMAP",
+                .product(name: "IO", package: "IO"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+            ]
+        ),
+
         // the `Mail` Frame module: accounts, identities and secrets declared in mail.frame
         .target(
             name: "MailFrame",
@@ -119,6 +136,7 @@ let package = Package(
                 "MailConnection",
                 "SMTP",
                 "IMAP",
+                "MailIndex",
                 "MailFrame",
                 .product(name: "Frame", package: "Frame"),
                 .product(name: "Arguments", package: "Arguments"),
@@ -134,6 +152,7 @@ let package = Package(
                 "MailConnection",
                 "SMTP",
                 "IMAP",
+                "MailIndex",
                 "MailFrame",
                 .product(name: "Milieu", package: "Milieu"),
                 .product(name: "Testing", package: "Testing"),

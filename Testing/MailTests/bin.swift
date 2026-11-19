@@ -115,6 +115,12 @@ enum MailTestSuite {
         Test("gmail-label-and-archive") {
             try await IMAPChangeTests.gmailLabels()
         }
+        Test("index-sync-incremental-and-clutter") {
+            try await IndexTests.syncAndCount()
+        }
+        Test("index-header-fields") {
+            try IndexTests.indexedFields()
+        }
         Test("imap-command-failure") {
             try await IMAPTests.failure()
         }
