@@ -33,6 +33,8 @@ email read 4182 -a work --save ~/Downloads/mail # also write its attachments (ne
 email read 4182 -a work --raw > message.eml     # the source as received
 email draft -a work --to client@example.org -s 'Afspraak' -b '…'
 email send  -a work --to client@example.org -s 'Afspraak' --body-file note.txt --attach plan.pdf
+email send  -a work --to client@example.org -s 'Offerte' --html-file offerte.html --attach offerte.pdf
+                                                # HTML alone gets a derived text version
 ```
 
 Every command takes `--config <dir>` (instead of `~/.config/mail`) and
