@@ -10,8 +10,12 @@ public enum MailSuspicionSignal: String, Sendable, CaseIterable {
     case unknownVendor
     /// Never written to.
     case stranger
-    /// Hardly any mail from this domain, ever.
+    /// Hardly any mail from this domain (from this address, for free mail), ever.
     case rareSender
+    /// Asks for payment from a free-mail address (gmail.com, outlook.com…), which real vendors do not invoice from.
+    case freemailInvoice
+    /// The same subject from several senders never written to: a campaign.
+    case campaign
     case dmarcFail
     case spfFail
     case dkimFail
@@ -25,6 +29,9 @@ public enum MailSuspicionSignal: String, Sendable, CaseIterable {
     case riskyAttachment
     /// The sender or domain was blocked in review.
     case blocked
+    /// Mail from this domain (this address, for free mail) over a long time:
+    /// lowers the score. Scams rotate senders, so they rarely earn it.
+    case established
 }
 
 /// What the score is measured against. Weights are a starting point, tuned on
@@ -41,6 +48,9 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
     public var paymentTerms: [String]
     /// At most this many messages from a domain counts as rare.
     public var rareCount: Int
+    /// At least this many messages across at least `establishedDays` counts as established.
+    public var establishedCount: Int
+    public var establishedDays: Int
 
     public init(
         trustedDomains: Set<String> = [],
@@ -48,7 +58,9 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
         threshold: Int = 50,
         weights: [MailSuspicionSignal: Int] = MailSuspicionPolicy.defaultWeights,
         paymentTerms: [String] = MailSuspicionPolicy.defaultPaymentTerms,
-        rareCount: Int = 2
+        rareCount: Int = 2,
+        establishedCount: Int = 3,
+        establishedDays: Int = 90
     ) {
         self.trustedDomains = Set(trustedDomains.map { $0.lowercased() })
         self.ownDomains = Set(ownDomains.map { $0.lowercased() })
@@ -56,6 +68,8 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
         self.weights = weights
         self.paymentTerms = paymentTerms
         self.rareCount = rareCount
+        self.establishedCount = establishedCount
+        self.establishedDays = establishedDays
     }
 
     public static let defaultWeights: [MailSuspicionSignal: Int] = [
@@ -63,6 +77,8 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
         .unknownVendor: 20,
         .stranger: 10,
         .rareSender: 10,
+        .freemailInvoice: 30,
+        .campaign: 20,
         .dmarcFail: 25,
         .spfFail: 10,
         .dkimFail: 10,
@@ -71,6 +87,7 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
         .lookalike: 35,
         .riskyAttachment: 25,
         .blocked: 100,
+        .established: -20,
     ]
 
     public static let defaultPaymentTerms = [
@@ -78,6 +95,14 @@ public struct MailSuspicionPolicy: Sendable, Equatable {
         "vervaldatum", "verloopt", "expir", "herinnering", "aanmaning", "reminder", "openstaand",
         "outstanding", "overdue", "incasso", "iban", "rekening", "renewal", "verlenging", "verlengen",
         "domein", "domain", "registratie", "registration", "abonnement", "subscription",
+    ]
+
+    /// Free mail providers: anyone can have an address there, so the domain says
+    /// nothing about the sender, and it is never yours or a vendor's.
+    public static let freemailDomains: Set<String> = [
+        "gmail.com", "googlemail.com", "icloud.com", "me.com", "mac.com", "outlook.com", "hotmail.com",
+        "live.com", "live.nl", "hotmail.nl", "msn.com", "yahoo.com", "ymail.com", "aol.com", "proton.me",
+        "protonmail.com", "gmx.com", "gmx.net", "ziggo.nl", "kpnmail.nl", "planet.nl", "home.nl", "zonnet.nl",
     ]
 
     public static let riskyAttachmentExtensions: Set<String> = [
@@ -133,19 +158,33 @@ extension MailIndex {
         let (condition, bindings) = filter.clause()
         let rows = try database.query(
             """
-            WITH domains AS (SELECT from_domain, COUNT(*) AS n FROM messages WHERE is_sent = 0 GROUP BY from_domain)
+            WITH domains AS (SELECT from_domain, COUNT(*) AS n, MAX(received_at) - MIN(received_at) AS span FROM messages WHERE is_sent = 0 GROUP BY from_domain),
+                 senders AS (SELECT from_address, COUNT(*) AS n, MAX(received_at) - MIN(received_at) AS span FROM messages WHERE is_sent = 0 GROUP BY from_address)
             SELECT m.mailbox, m.uid, m.message_id, m.from_address, m.from_name, m.from_domain,
                    m.reply_to_domain, m.return_path_domain, m.subject, m.received_at,
                    m.spf, m.dkim, m.dmarc, m.attachment_names, COALESCE(d.n, 0),
                    EXISTS (SELECT 1 FROM correspondents c WHERE c.address = m.from_address),
-                   EXISTS (SELECT 1 FROM correspondents c WHERE c.domain = m.from_domain)
-            FROM messages m LEFT JOIN domains d ON d.from_domain = m.from_domain
+                   EXISTS (SELECT 1 FROM correspondents c WHERE c.domain = m.from_domain),
+                   COALESCE(s.n, 0), COALESCE(d.span, 0), COALESCE(s.span, 0)
+            FROM messages m
+            LEFT JOIN domains d ON d.from_domain = m.from_domain
+            LEFT JOIN senders s ON s.from_address = m.from_address
             WHERE \(condition)
             """,
             bindings
         )
 
         let known = policy.ownDomains.union(trustedDomains)
+        let freemail = MailSuspicionPolicy.freemailDomains
+
+        // Subjects sent by several distinct addresses never written to.
+        var campaignSenders: [String: Set<String>] = [:]
+        for row in rows where (row[15].int ?? 0) == 0 {
+            if let address = row[3].string, let key = Self.campaignKey(row[8].string) {
+                campaignSenders[key, default: []].insert(address)
+            }
+        }
+
         var results: [MailSuspicion] = []
         for row in rows {
             let messageID = row[2].string
@@ -175,22 +214,36 @@ extension MailIndex {
             if blocked {
                 add(.blocked, "blocked in review")
             }
-            // Someone you wrote to (or their domain) is an existing relationship.
-            let correspondent = (row[15].int ?? 0) != 0 || (row[16].int ?? 0) != 0
+            // Someone you wrote to (or their organization's domain) is an existing
+            // relationship. At a free-mail provider only the exact address counts.
+            let isFreemail = domain.map { freemail.contains(MailDomain.registrable($0)) || freemail.contains($0) } ?? false
+            let correspondent = (row[15].int ?? 0) != 0 || (!isFreemail && (row[16].int ?? 0) != 0)
             let wording = ([subject ?? ""] + attachments).joined(separator: " ").lowercased()
             let terms = policy.paymentTerms.filter { wording.contains($0) }
             if !terms.isEmpty {
                 add(.paymentRequest, "payment wording: \(terms.prefix(3).joined(separator: ", "))")
                 if !correspondent {
                     add(.unknownVendor, "\(domain ?? "sender") is not a known vendor")
+                    if isFreemail {
+                        add(.freemailInvoice, "asks for payment from a \(domain ?? "free-mail") address")
+                    }
                 }
             }
             if !correspondent {
                 add(.stranger, "never written to")
             }
-            let domainCount = row[14].int ?? 0
-            if !correspondent && domainCount <= policy.rareCount {
-                add(.rareSender, domainCount <= 1 ? "first mail from \(domain ?? "this domain")" : "\(domainCount) mails from \(domain ?? "this domain") ever")
+            let origin = isFreemail ? (address ?? "this sender") : (domain ?? "this domain")
+            let originCount = isFreemail ? (row[17].int ?? 0) : (row[14].int ?? 0)
+            if !correspondent && originCount <= policy.rareCount {
+                add(.rareSender, originCount <= 1 ? "first mail from \(origin)" : "\(originCount) mails from \(origin) ever")
+            }
+            let span = isFreemail ? (row[19].double ?? 0) : (row[18].double ?? 0)
+            let months = Int(span / (30 * 86_400))
+            if originCount >= policy.establishedCount && span >= Double(policy.establishedDays) * 86_400 {
+                add(.established, "\(originCount) mails from \(origin) over \(months) months")
+            }
+            if !correspondent, let key = Self.campaignKey(subject), let senders = campaignSenders[key], senders.count >= 2 {
+                add(.campaign, "same subject from \(senders.count) unknown senders")
             }
             for (signal, column, method) in [(MailSuspicionSignal.dmarcFail, 12, "dmarc"), (.spfFail, 10, "spf"), (.dkimFail, 11, "dkim")] {
                 if let result = row[column].string, ["fail", "softfail", "permerror"].contains(result) {
@@ -231,6 +284,19 @@ extension MailIndex {
         }
         results.sort { ($0.score, $0.receivedAt ?? .distantPast) > ($1.score, $1.receivedAt ?? .distantPast) }
         return limit.map { Array(results.prefix($0)) } ?? results
+    }
+}
+
+extension MailIndex {
+    /// A subject normalized for comparing across senders; `nil` when too short to mean anything.
+    static func campaignKey(
+        _ subject: String?
+    ) -> String? {
+        guard let subject else {
+            return nil
+        }
+        let key = subject.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return key.count >= 12 ? key : nil
     }
 }
 

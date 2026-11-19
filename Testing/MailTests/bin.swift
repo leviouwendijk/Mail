@@ -127,6 +127,9 @@ enum MailTestSuite {
         Test("review-decisions-trust-block-dismiss") {
             try await ReviewTests.decisions()
         }
+        Test("review-freemail-invoice-campaign") {
+            try await ReviewTests.freemailCampaign()
+        }
         Test("review-domain-lookalikes") {
             try ReviewTests.domains()
         }

@@ -17,12 +17,6 @@ enum ReviewCommand: BoundArgumentCommand {
         ]
     }
 
-    /// Free mail providers: an identity there does not make the provider's domain yours.
-    static let sharedProviders: Set<String> = [
-        "gmail.com", "googlemail.com", "icloud.com", "me.com", "mac.com", "outlook.com", "hotmail.com",
-        "live.com", "yahoo.com", "proton.me", "protonmail.com",
-    ]
-
     static func run(
         _ options: ReviewOptions,
         invocation: ParsedInvocation
@@ -51,7 +45,7 @@ enum ReviewCommand: BoundArgumentCommand {
             accounts.accounts
                 .flatMap(\.identities)
                 .map { String($0.address.address.domain).lowercased() }
-                .filter { !sharedProviders.contains($0) }
+                .filter { !MailSuspicionPolicy.freemailDomains.contains($0) }
         )
         let policy = MailSuspicionPolicy(
             trustedDomains: Set(options.trusted),

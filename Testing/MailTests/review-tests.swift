@@ -97,4 +97,33 @@ enum ReviewTests {
         try Expect.false(MailDomain.isWithin("eviltransip.nl", ["transip.nl"]), "Suffix is not a subdomain")
         try Expect.equal(MailDomain.distance("kitten", "sitting"), 3, "Levenshtein")
     }
+
+    /// 2026-11-19: two fake "Domeinregistratie" invoices from random gmail
+    /// addresses scored 20 because a gmail correspondent made gmail.com a known domain.
+    static func freemailCampaign() async throws {
+        let to = ("contact", "hondenmeesters.nl")
+        let invoice = "((\"text\" \"plain\" NIL NIL NIL \"7bit\" 100 3) (\"application\" \"pdf\" NIL NIL NIL \"base64\" 40000 NIL (\"attachment\" (\"filename\" \"Factuur 100200.pdf\")) NIL NIL) \"mixed\")"
+        var lines = ["* OK ready", "* CAPABILITY IMAP4rev1 SPECIAL-USE UIDPLUS", "A1 OK done"]
+        lines += ["* LIST (\\HasNoChildren) \"/\" \"INBOX\"", "* LIST (\\HasNoChildren \\Sent) \"/\" \"Sent\"", "A2 OK listed"]
+        lines += ["* 3 EXISTS", "* OK [UIDVALIDITY 5] v", "* OK [UIDNEXT 4] n", "A3 OK [READ-ONLY] examined"]
+        lines += ["* SEARCH 1 2 3", "A4 OK searched"]
+        lines += IndexTests.fetch(1, uid: 1, flags: "", from: ("Sanne", "sanne.b1234", "gmail.com"), to: to, subject: "Domeinregistratie voor 2027 / 2028", structure: invoice)
+        lines += IndexTests.fetch(2, uid: 2, flags: "", from: ("Petra", "petra.v5678", "gmail.com"), to: to, subject: "Domeinregistratie voor 2027 / 2028", structure: invoice)
+        lines += IndexTests.fetch(3, uid: 3, flags: "\\Seen", from: ("Klant", "klant.hond", "gmail.com"), to: to, subject: "Vraag over de factuur")
+        lines += ["A5 OK fetched"]
+        lines += ["* 1 EXISTS", "* OK [UIDVALIDITY 6] v", "* OK [UIDNEXT 2] n", "A6 OK [READ-ONLY] examined"]
+        lines += ["* SEARCH 1", "A7 OK searched"]
+        lines += IndexTests.fetch(1, uid: 1, flags: "\\Seen", from: ("Hondenmeesters", "contact", "hondenmeesters.nl"), to: ("klant.hond", "gmail.com"), subject: "Re: Vraag")
+        lines += ["A8 OK fetched"]
+
+        let session = IMAPSession(transport: ScriptedTransport(lines))
+        try await session.start()
+        let index = try MailIndex(path: ":memory:")
+        _ = try await index.sync(session)
+
+        let suspects = try await index.suspicious(policy)
+        try Expect.equal(suspects.map(\.uid.rawValue).sorted(), [1, 2], "Both fake invoices, not the client")
+        let signals = Set(suspects[0].reasons.map(\.signal))
+        try Expect.true(signals.isSuperset(of: [.freemailInvoice, .campaign, .stranger, .unknownVendor, .rareSender]), "A gmail correspondent does not vouch for gmail.com")
+    }
 }
