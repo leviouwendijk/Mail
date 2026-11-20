@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import IMAP
 
@@ -61,20 +62,43 @@ public struct MailSelector: Sendable, Hashable, CustomStringConvertible {
         case role(MailboxRole)
     }
 
-    public enum Failure: Error, Sendable, Equatable, LocalizedError {
+    public enum Failure: Error, Sendable, Equatable, SemanticError, ErrorNamespaced, ErrorDispositionProviding {
         case empty
         case unknownRole(String)
         case unknownTarget(String, accounts: [String], groups: [String])
 
-        public var errorDescription: String? {
+        public static let errorNamespace = "mail.selector"
+
+        public var errorCode: String {
+            switch self {
+            case .empty: return "empty"
+            case .unknownRole: return "unknown_role"
+            case .unknownTarget: return "unknown_target"
+            }
+        }
+
+        public var errorPresentation: ErrorPresentation {
             switch self {
             case .empty:
-                return "An empty selector; use an account, a group or *, optionally followed by :mailbox or :@role."
+                return .init(
+                    message: "An empty selector.",
+                    recoverySuggestion: "Use an account, a group or *, optionally followed by :mailbox or :@role."
+                )
             case .unknownRole(let role):
-                return "Unknown mailbox role '@\(role)'; use @inbox, @sent, @drafts, @junk, @trash, @archive, @all or @flagged."
+                return .init(
+                    message: "Unknown mailbox role '@\(role)'.",
+                    recoverySuggestion: "Use @inbox, @sent, @drafts, @junk, @trash, @archive, @all or @flagged."
+                )
             case .unknownTarget(let name, let accounts, let groups):
-                return "'\(name)' is neither an account (\(accounts.joined(separator: ", "))) nor a group (\(groups.isEmpty ? "none" : groups.joined(separator: ", ")))."
+                return .init(
+                    message: "'\(name)' is neither an account nor a group.",
+                    recoverySuggestion: "Accounts: \(accounts.joined(separator: ", ")); groups: \(groups.isEmpty ? "none" : groups.joined(separator: ", "))."
+                )
             }
+        }
+
+        public var errorDisposition: ErrorDisposition? {
+            .invalid_input
         }
     }
 

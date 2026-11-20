@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import IMAP
 import MailConnection
@@ -95,13 +96,33 @@ public extension MailAccounts {
     }
 }
 
-public enum MailSearchFailure: Error, Sendable, Equatable, LocalizedError {
+public enum MailSearchFailure: Error, Sendable, Equatable, SemanticError, ErrorNamespaced, ErrorDispositionProviding {
     case tooManyMailboxes(Int)
 
-    public var errorDescription: String? {
+    public static let errorNamespace = "mail.search"
+
+    public var errorCode: String {
+        "too_many_mailboxes"
+    }
+
+    public var errorPresentation: ErrorPresentation {
         switch self {
         case .tooManyMailboxes(let maximum):
-            return "The selectors pick more than \(maximum) mailboxes; narrow them."
+            return .init(
+                message: "The selectors pick more than \(maximum) mailboxes.",
+                recoverySuggestion: "Narrow them to fewer mailboxes."
+            )
         }
+    }
+
+    public var errorDiagnosticFields: [ErrorDiagnosticField] {
+        switch self {
+        case .tooManyMailboxes(let maximum):
+            return [.init(key: "maximum", value: maximum)]
+        }
+    }
+
+    public var errorDisposition: ErrorDisposition? {
+        .invalid_input
     }
 }

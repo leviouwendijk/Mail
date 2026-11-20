@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import Frame
 import IO
@@ -216,7 +217,7 @@ public enum MailConfiguration {
     static func describe(
         _ error: any Error
     ) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        error.explanation
     }
 }
 

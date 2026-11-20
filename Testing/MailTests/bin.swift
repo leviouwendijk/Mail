@@ -28,6 +28,15 @@ enum MailTestSuite {
         "mail",
         title: "Mail"
     ) {
+        Test("imap-errors-name-the-failure") {
+            try ErrorTests.imapNamesTheFailure()
+        }
+        Test("smtp-and-connection-errors") {
+            try ErrorTests.smtpAndConnection()
+        }
+        Test("address-and-access-errors") {
+            try ErrorTests.addressesAndAccess()
+        }
         Test("address-accepts-valid") {
             try AddressTests.valid()
         }

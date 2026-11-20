@@ -1,3 +1,4 @@
+import Errors
 import Arguments
 import Foundation
 import Frame
@@ -181,6 +182,6 @@ extension EmailCLI {
     static func describe(
         _ error: any Error
     ) -> String {
-        (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+        error.explanation
     }
 }

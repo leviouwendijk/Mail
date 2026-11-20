@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import Frame
 import IMAP
@@ -10,14 +11,35 @@ import SMTP
 /// A `mail.frame` document read into guaranteed values, with a credential
 /// provider that resolves each account's password from where the file says.
 public struct MailAccounts: Sendable {
-    public enum Failure: Error, Sendable, Equatable, LocalizedError {
+    public enum Failure: Error, Sendable, Equatable, SemanticError, ErrorNamespaced, ErrorDispositionProviding {
         case invalid(field: String, reason: String)
 
-        public var errorDescription: String? {
+        public static let errorNamespace = "mail.accounts"
+
+        public var errorCode: String {
+            "invalid_configuration"
+        }
+
+        public var errorPresentation: ErrorPresentation {
             switch self {
             case .invalid(let field, let reason):
-                return "\(field): \(reason)"
+                return .init(
+                    message: "The mail configuration's \(field) is invalid.",
+                    reason: reason,
+                    recoverySuggestion: "`email check` validates the configuration."
+                )
             }
+        }
+
+        public var errorDiagnosticFields: [ErrorDiagnosticField] {
+            switch self {
+            case .invalid(let field, _):
+                return [.init(key: "field", value: field)]
+            }
+        }
+
+        public var errorDisposition: ErrorDisposition? {
+            .requires_configuration
         }
     }
 

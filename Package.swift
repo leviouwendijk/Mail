@@ -47,6 +47,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/leviouwendijk/Primitives.git", branch: "master"),
+        .package(url: "https://github.com/leviouwendijk/Errors.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Readers.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Writers.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Parsing.git", branch: "master"),
@@ -64,6 +65,7 @@ let package = Package(
             name: "Mail",
             dependencies: [
                 .product(name: "Primitives", package: "Primitives"),
+                .product(name: "Errors", package: "Errors"),
                 .product(name: "Readers", package: "Readers"),
                 .product(name: "Writers", package: "Writers"),
                 .product(name: "IO", package: "IO"),
@@ -76,6 +78,7 @@ let package = Package(
             name: "MailConnection",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 .product(name: "Milieu", package: "Milieu"),
             ]
         ),
@@ -84,6 +87,7 @@ let package = Package(
             name: "SMTP",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 "MailConnection",
                 .product(name: "Milieu", package: "Milieu"),
                 .product(name: "Parsing", package: "Parsing"),
@@ -94,6 +98,7 @@ let package = Package(
             name: "IMAP",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 "MailConnection",
                 .product(name: "Milieu", package: "Milieu"),
                 .product(name: "Parsing", package: "Parsing"),
@@ -116,6 +121,7 @@ let package = Package(
             name: "MailFrame",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 "MailConnection",
                 "SMTP",
                 "IMAP",
@@ -133,6 +139,7 @@ let package = Package(
             name: "email",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 "MailConnection",
                 "SMTP",
                 "IMAP",
@@ -151,6 +158,7 @@ let package = Package(
             name: "MailTests",
             dependencies: [
                 "Mail",
+                .product(name: "Errors", package: "Errors"),
                 "MailConnection",
                 "SMTP",
                 "IMAP",

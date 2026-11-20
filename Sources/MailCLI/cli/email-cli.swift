@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import IMAP
 import Mail
@@ -51,8 +52,7 @@ extension EmailCLI {
     static func writeError(
         _ error: any Error
     ) {
-        let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
-        FileHandle.standardError.write(Data("email: \(message)\n".utf8))
+        FileHandle.standardError.write(Data("email: \(error.explanation)\n".utf8))
     }
 
     /// The configuration in `directory`, or the default location.

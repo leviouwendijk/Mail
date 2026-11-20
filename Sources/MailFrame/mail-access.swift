@@ -1,3 +1,4 @@
+import Errors
 import Foundation
 import Frame
 import Mail
@@ -52,7 +53,7 @@ extension MailFrame.Access: FrameDescribable {
 /// What a session may reach, resolved from a profile: account names, mailbox
 /// patterns and identities, plus what it may write. `unrestricted` allows all.
 public struct MailAccess: Sendable, Equatable {
-    public enum Failure: Error, Sendable, Equatable, LocalizedError {
+    public enum Failure: Error, Sendable, Equatable, SemanticError, ErrorNamespaced, ErrorDispositionProviding {
         case account(String, profile: String)
         case mailbox(String, profile: String)
         case identity(String, profile: String)
@@ -61,22 +62,67 @@ public struct MailAccess: Sendable, Equatable {
         case crossLabelSearch(profile: String)
         case unknownProfile(String, known: [String])
 
-        public var errorDescription: String? {
+        public static let errorNamespace = "mail.access"
+
+        public var errorCode: String {
+            switch self {
+            case .account: return "account_denied"
+            case .mailbox: return "mailbox_denied"
+            case .identity: return "identity_denied"
+            case .drafting: return "drafting_denied"
+            case .sending: return "sending_denied"
+            case .crossLabelSearch: return "cross_label_search_denied"
+            case .unknownProfile: return "unknown_profile"
+            }
+        }
+
+        public var errorPresentation: ErrorPresentation {
             switch self {
             case .account(let name, let profile):
-                return "Account '\(name)' is not accessible under access profile '\(profile)'."
+                return .init(message: "Account '\(name)' is not accessible under access profile '\(profile)'.")
             case .mailbox(let name, let profile):
-                return "Mailbox '\(name)' is not accessible under access profile '\(profile)'."
+                return .init(
+                    message: "Mailbox '\(name)' is not accessible under access profile '\(profile)'.",
+                    messageSensitivity: .potentially_sensitive
+                )
             case .identity(let address, let profile):
-                return "Sending as \(address) is not allowed under access profile '\(profile)'."
+                return .init(
+                    message: "Sending as \(address) is not allowed under access profile '\(profile)'.",
+                    messageSensitivity: .potentially_sensitive
+                )
             case .drafting(let profile):
-                return "Access profile '\(profile)' is read-only: no drafts or sending."
+                return .init(message: "Access profile '\(profile)' is read-only: no drafts or sending.")
             case .sending(let profile):
-                return "Access profile '\(profile)' allows drafts only, not sending."
+                return .init(message: "Access profile '\(profile)' allows drafts only, not sending.")
             case .crossLabelSearch(let profile):
-                return "Access profile '\(profile)' limits mailboxes, so Gmail search syntax and thread search, which reach across labels, are refused."
+                return .init(
+                    message: "Access profile '\(profile)' limits mailboxes, so Gmail search syntax and thread search are refused.",
+                    reason: "Both reach across labels, past the mailboxes the profile allows."
+                )
             case .unknownProfile(let name, let known):
-                return "No access profile '\(name)'; known: \(known.isEmpty ? "none" : known.joined(separator: ", "))."
+                return .init(
+                    message: "No access profile '\(name)'.",
+                    recoverySuggestion: "Known profiles: \(known.isEmpty ? "none" : known.joined(separator: ", "))."
+                )
+            }
+        }
+
+        public var errorDiagnosticFields: [ErrorDiagnosticField] {
+            switch self {
+            case .account(_, let profile), .mailbox(_, let profile), .identity(_, let profile),
+                 .drafting(let profile), .sending(let profile), .crossLabelSearch(let profile):
+                return [.init(key: "access_profile", value: profile)]
+            case .unknownProfile:
+                return []
+            }
+        }
+
+        public var errorDisposition: ErrorDisposition? {
+            switch self {
+            case .unknownProfile:
+                return .requires_configuration
+            default:
+                return .requires_access
             }
         }
     }

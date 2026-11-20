@@ -1,5 +1,5 @@
 {
-  "originHash" : "9684ad4eb04d775e6d6d3aa54592a4a30adf9fd67ea602fd1bdc6f4bca1070c8",
+  "originHash" : "3d6ae3e7e60e15aff542f9945695516ebbd4fba40895e6f8c0a8e9e2954a1d69",
   "pins" : [
     {
       "identity" : "arguments",
@@ -26,6 +26,24 @@
       "state" : {
         "branch" : "master",
         "revision" : "615158c50130785c3e5934d6210ecf447134ca3b"
+      }
+    },
+    {
+      "identity" : "dsl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/DSL.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b85a4fcf315dfa6c100b38adc7a9cdec15ad817f"
+      }
+    },
+    {
+      "identity" : "errors",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/leviouwendijk/Errors.git",
+      "state" : {
+        "branch" : "master",
+        "revision" : "2875a1c9d8cc4839ab81fc0a453aa4fc423c9d6f"
       }
     },
     {
@@ -115,7 +133,7 @@
       "location" : "https://github.com/leviouwendijk/Path.git",
       "state" : {
         "branch" : "master",
-        "revision" : "3ad6bcbfc000566cb37deff48d97adc93d2c94b3"
+        "revision" : "51d13fcd2cab1b1d420b9fadaef5d5f7a2c1191b"
       }
     },
     {
@@ -133,7 +151,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "776500d2ee4eb47ca536bd307ce1bb9d48878423"
+        "revision" : "4b81c1605140fe8b2bd01fd02fe9e8782edec564"
       }
     },
     {
@@ -169,7 +187,7 @@
       "location" : "https://github.com/leviouwendijk/SQLite.git",
       "state" : {
         "branch" : "master",
-        "revision" : "0a871ee6bcb45375a583ff2cb9b34381325226cc"
+        "revision" : "63a7f6bbe6e1d30e3cf03624cffc6067f1a29376"
       }
     },
     {
