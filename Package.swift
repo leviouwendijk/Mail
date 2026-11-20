@@ -36,14 +36,6 @@ let package = Package(
             name: "email",
             targets: ["email"]
         ),
-        .executable(
-            name: "t_mail",
-            targets: ["MailTests"]
-        ),
-        .executable(
-            name: "t_mail_live",
-            targets: ["MailLiveTests"]
-        ),
     ],
     dependencies: [
         .package(url: "https://github.com/leviouwendijk/Primitives.git", branch: "master"),
@@ -57,7 +49,6 @@ let package = Package(
         .package(url: "https://github.com/leviouwendijk/Path.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/Arguments.git", branch: "master"),
         .package(url: "https://github.com/leviouwendijk/SQLite.git", branch: "master"),
-        .package(url: "https://github.com/leviouwendijk/Testing.git", branch: "master"),
     ],
     targets: [
         // message model, MIME rendering and parsing; no networking
@@ -152,37 +143,6 @@ let package = Package(
                 .product(name: "IO", package: "IO"),
             ],
             path: "Sources/MailCLI"
-        ),
-
-        .executableTarget(
-            name: "MailTests",
-            dependencies: [
-                "Mail",
-                .product(name: "Errors", package: "Errors"),
-                "MailConnection",
-                "SMTP",
-                "IMAP",
-                "MailIndex",
-                "MailFrame",
-                .product(name: "Milieu", package: "Milieu"),
-                .product(name: "Roots", package: "Frame"),
-                .product(name: "Writers", package: "Writers"),
-                .product(name: "IO", package: "IO"),
-                .product(name: "Testing", package: "Testing"),
-            ],
-            path: "Testing/MailTests"
-        ),
-
-        // probes real servers without credentials; needs network
-        .executableTarget(
-            name: "MailLiveTests",
-            dependencies: [
-                "MailConnection",
-                "SMTP",
-                "IMAP",
-                .product(name: "Testing", package: "Testing"),
-            ],
-            path: "Testing/MailLiveTests"
         ),
     ]
 )
