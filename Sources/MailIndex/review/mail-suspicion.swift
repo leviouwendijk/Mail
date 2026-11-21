@@ -302,7 +302,7 @@ extension MailIndex {
 
 /// Domain comparisons without a public-suffix list: good enough for `.nl`,
 /// `.com` and friends; `co.uk`-style suffixes compare one label too short.
-package enum MailDomain {
+@_spi(Testing) public enum MailDomain {
     /// The last two labels: `mail.shop.example.nl` → `example.nl`.
     package static func registrable(
         _ domain: String
@@ -310,7 +310,7 @@ package enum MailDomain {
         domain.lowercased().split(separator: ".").suffix(2).joined(separator: ".")
     }
 
-    package static func related(
+    @_spi(Testing) public static func related(
         _ lhs: String,
         _ rhs: String
     ) -> Bool {
@@ -318,7 +318,7 @@ package enum MailDomain {
     }
 
     /// `domain` is one of `domains` or a subdomain of one.
-    package static func isWithin(
+    @_spi(Testing) public static func isWithin(
         _ domain: String,
         _ domains: Set<String>
     ) -> Bool {
@@ -328,7 +328,7 @@ package enum MailDomain {
 
     /// The known domain `domain` resembles without being it: within two edits,
     /// or carrying its name (`hondenmeesters-betaling.com`).
-    package static func imitates(
+    @_spi(Testing) public static func imitates(
         _ domain: String,
         _ known: Set<String>
     ) -> String? {
@@ -348,7 +348,7 @@ package enum MailDomain {
     }
 
     /// Levenshtein distance.
-    package static func distance(
+    @_spi(Testing) public static func distance(
         _ lhs: String,
         _ rhs: String
     ) -> Int {

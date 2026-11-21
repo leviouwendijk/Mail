@@ -82,7 +82,7 @@ public struct IndexedMessage: Sendable, Equatable {
     }
 
     /// `Nieuws <nieuws.example.org>` → `nieuws.example.org`.
-    package static func listID(
+    @_spi(Testing) public static func listID(
         _ header: String
     ) -> String {
         if let open = header.lastIndex(of: "<"), let close = header[open...].firstIndex(of: ">") {
@@ -92,7 +92,7 @@ public struct IndexedMessage: Sendable, Equatable {
     }
 
     /// The domain of `<bounce@mail.example.org>`.
-    package static func domain(
+    @_spi(Testing) public static func domain(
         _ header: String
     ) -> String? {
         let address = listID(header)
@@ -104,7 +104,7 @@ public struct IndexedMessage: Sendable, Equatable {
     }
 
     /// The first `method=result` in `Authentication-Results`.
-    package static func result(
+    @_spi(Testing) public static func result(
         _ method: String,
         in authentication: String
     ) -> String? {

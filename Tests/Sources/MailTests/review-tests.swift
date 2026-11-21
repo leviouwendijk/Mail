@@ -1,7 +1,7 @@
 import Foundation
 import IMAP
 import Mail
-import MailIndex
+@_spi(Testing) import MailIndex
 import Testing
 
 enum ReviewTests {
