@@ -1,10 +1,12 @@
 import Foundation
+import Primitives
 
 /// Renders a `MailMessage` into an RFC 5322 message. `Bcc` is left out of what
 /// is delivered; the sender's own copies (Sent, Drafts) keep it with `keepsBcc`.
 public struct MailRenderer: Sendable {
     public var makeBoundary: @Sendable () -> String
-    public var now: @Sendable () -> Date
+    /// Dates a message that has no `date` of its own.
+    public var clock: WallClock
     /// Writes the `Bcc` header, for a copy only the sender sees: a Sent copy
     /// records who was blind-copied, a draft keeps them when it is sent later.
     public var keepsBcc: Bool
@@ -12,11 +14,11 @@ public struct MailRenderer: Sendable {
     public init(
         keepsBcc: Bool = false,
         makeBoundary: @escaping @Sendable () -> String = { "=_mail_\(UUID().uuidString)" },
-        now: @escaping @Sendable () -> Date = { Date() }
+        clock: WallClock = .system
     ) {
         self.keepsBcc = keepsBcc
         self.makeBoundary = makeBoundary
-        self.now = now
+        self.clock = clock
     }
 
     public func rendered(
@@ -43,7 +45,7 @@ public struct MailRenderer: Sendable {
         for message: MailMessage
     ) -> [MailHeaderField] {
         var headers = [
-            MailHeaderField("Date", Self.date(message.date ?? now())),
+            MailHeaderField("Date", Self.date(message.date ?? Date(clock.now))),
             MailHeaderField("From", Self.addressList([message.from])),
         ]
         if !message.to.isEmpty {

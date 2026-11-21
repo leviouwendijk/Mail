@@ -1,6 +1,7 @@
 import Foundation
 import Mail
 import MailConnection
+import Primitives
 
 /// Serves a scripted server byte stream and records everything the client writes.
 actor ScriptedTransport: MailTransport {
@@ -91,7 +92,7 @@ enum MailFixtures {
         let counter = Counter()
         return MailRenderer(
             makeBoundary: { "b\(counter.next())" },
-            now: { Date(timeIntervalSince1970: 0) }
+            clock: WallClock { .init(nanosecondsSinceUnixEpoch: 0) }
         )
     }
 

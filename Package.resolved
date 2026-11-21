@@ -1,5 +1,5 @@
 {
-  "originHash" : "3d6ae3e7e60e15aff542f9945695516ebbd4fba40895e6f8c0a8e9e2954a1d69",
+  "originHash" : "b99b6d76211365dd22c967b39beadc00f85f4fdfa8ceca5e16ce778a479841be",
   "pins" : [
     {
       "identity" : "arguments",
@@ -16,7 +16,7 @@
       "location" : "https://github.com/leviouwendijk/Atomos.git",
       "state" : {
         "branch" : "master",
-        "revision" : "5ffdb160c4913e02214020eb75ac620900cf2914"
+        "revision" : "0dbb0c492669c725aed5f91b965440c7cd4256e3"
       }
     },
     {
@@ -151,7 +151,7 @@
       "location" : "https://github.com/leviouwendijk/Primitives.git",
       "state" : {
         "branch" : "master",
-        "revision" : "4b81c1605140fe8b2bd01fd02fe9e8782edec564"
+        "revision" : "1e9c7defa2037e0b74be9e95d8e987442323d372"
       }
     },
     {
